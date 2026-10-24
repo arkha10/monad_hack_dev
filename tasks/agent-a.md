@@ -36,7 +36,7 @@
 ## Notes
 
 - Branch / commit / PR: agent-a/frontend, Phase 0 bootstrap in progress
-- Phase0 locked SHA: TBD
+- Phase0 locked SHA: 5b0d41be10674acd97e9120588ff04c28ea424d7, merged to origin/main by commit a29d453
 - Chosen package manager, pinned dependencies and build commands: npm 11.19.0, Node 26.7.0, `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`
 - Live frontend / backend URLs: TBD
 - Tests executed and observed outputs: lint, typecheck, and build passed. Shared helper test passed after fixture correction. Forge unavailable on this laptop.
