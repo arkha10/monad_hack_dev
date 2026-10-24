@@ -1,0 +1,12 @@
+{
+  "name": "@boai/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./contracts": "./src/contracts.ts",
+    "./helpers": "./src/helpers.ts",
+    "./seed": "./src/seed.ts"
+  }
+}

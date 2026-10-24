@@ -1,0 +1,37 @@
+{
+  "name": "boai-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-24",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MATCHMAKER",
+        "class_name": "MatchmakerDO"
+      },
+      {
+        "name": "MATCHES",
+        "class_name": "MatchDO"
+      },
+      {
+        "name": "LEDGER",
+        "class_name": "LedgerDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "MatchmakerDO",
+        "MatchDO",
+        "LedgerDO"
+      ]
+    }
+  ],
+  "vars": {
+    "WEB_ORIGIN": "http://localhost:5173"
+  }
+}

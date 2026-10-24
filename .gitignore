@@ -1,0 +1,50 @@
+# dependencies, build outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+.next/
+.cache/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Foundry artifacts and caches
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/coverage/
+contracts/lcov.info
+
+# secrets (never commit credentials/private keys)
+.env
+.env.*
+!.env.example
+!.env.*.example
+.dev.vars
+.dev.vars.*
+**/.dev.vars
+**/.dev.vars.*
+*.pem
+*.key
+*.p12
+*.keystore
+secrets.json
+credentials.json
+
+# local deploy state
+.wrangler/
+.vercel/
+.supabase/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
