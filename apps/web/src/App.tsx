@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { MatchResult, MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
+import type { CreditBalance, MatchResult, MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
 import { buildExplorerTxUrl, parseBehavior } from "@boai/shared/helpers";
 import { SEED } from "@boai/shared/seed";
 import { API_BASE_URL, api } from "./lib/api";
 import { getSession, googleLogin, guestLogin, signOut, supabase } from "./lib/auth";
+import { useWallet } from "./lib/web3/useWallet";
 import { WalletPage } from "./routes/Wallet";
 import { RewardsPage } from "./routes/Rewards";
 
@@ -32,9 +33,27 @@ const navGlyphs: Record<(typeof links)[number][0], string> = {
 
 function Shell({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(false);
+  const [credits, setCredits] = useState<CreditBalance | null>(null);
+  const wallet = useWallet();
+
+  const refreshCredits = async () => {
+    try {
+      const res = await api.getCredits();
+      if (res && res.data) {
+        setCredits(res.data);
+      }
+    } catch {
+      // Guest or session pending
+    }
+  };
+
   useEffect(() => {
     getSession().then((value) => setOnline(Boolean(value)));
+    void refreshCredits();
+    const interval = setInterval(refreshCredits, 8000);
+    return () => clearInterval(interval);
   }, []);
+
   return (
     <div className="app">
       <header>
@@ -53,7 +72,27 @@ function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <span className="session-dot">{online ? "● ONLINE" : "○ GUEST"}</span>
+        <div className="header-right">
+          <Link to="/wallet" className="credit-pill" title="Saldo Kredit BOAI (Klik untuk kelola Dompet)">
+            <span className="coin-icon">🪙</span>
+            <span className="credit-amount">{credits !== null ? credits.available : '100'}</span>
+            <span className="credit-label">KREDIT</span>
+          </Link>
+
+          {wallet.address !== null ? (
+            <Link to="/wallet" className="wallet-chip connected" title={`Terkoneksi ke Monad Testnet: ${wallet.address}`}>
+              <span className="wallet-dot">●</span>
+              <span className="mono">{wallet.address.slice(0, 6)}…{wallet.address.slice(-4)}</span>
+            </Link>
+          ) : (
+            <Link to="/wallet" className="wallet-chip connect" title="Hubungkan Monad Testnet Wallet">
+              <span>⚡</span>
+              <span>Hubungkan Wallet</span>
+            </Link>
+          )}
+
+          <span className="session-dot">{online ? "● ONLINE" : "○ GUEST"}</span>
+        </div>
       </header>
       {children}
       <footer>
@@ -889,10 +928,26 @@ function LeaderboardPage() {
 
 function ShopPage() {
   const [status, setStatus] = useState("");
+  const [credits, setCredits] = useState<CreditBalance | null>(null);
+
+  const fetchCredits = async () => {
+    try {
+      const res = await api.getCredits();
+      if (res && res.data) setCredits(res.data);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    void fetchCredits();
+  }, []);
+
   const claim = async () => {
     try {
-      await api.claimDemoAdReward();
-      setStatus("Reward demo diberikan. SIMULASI IKLAN.");
+      const res = await api.claimDemoAdReward();
+      setCredits(res.data.balance);
+      setStatus("Reward demo diberikan! +25 BOAI_CREDIT berhasil ditambahkan.");
     } catch (error) {
       setStatus(
         error instanceof Error ? error.message : "Reward belum tersedia",
@@ -903,6 +958,13 @@ function ShopPage() {
     <main className="content">
       <p className="eyebrow">COSMETICS · NO GAMEPLAY MODIFIER</p>
       <h1>Toko kosmetik</h1>
+      <div className="credit-shop-header">
+        <div>
+          <small className="eyebrow">DOMPET VIRTUAL</small>
+          <h2>Saldo Anda: 🪙 {credits !== null ? credits.available : '100'} BOAI_CREDIT</h2>
+        </div>
+        <button onClick={claim}>+ Tonton Simulasi Iklan (+25 Kredit)</button>
+      </div>
       <div className="shop-grid">
         {SEED.cosmetics.map((item) => (
           <article className="panel item-card" key={item.id}>
@@ -942,6 +1004,15 @@ function ShopPage() {
 }
 
 function ProfilePage() {
+  const [credits, setCredits] = useState<CreditBalance | null>(null);
+  const wallet = useWallet();
+
+  useEffect(() => {
+    api.getCredits().then((res) => {
+      if (res && res.data) setCredits(res.data);
+    }).catch(() => {});
+  }, []);
+
   const logout = async () => {
     await signOut();
     window.location.assign("/");
@@ -953,14 +1024,27 @@ function ProfilePage() {
       <div className="panel profile-card">
         <span className="avatar">G</span>
         <h2>Guest Player</h2>
-        <p>
-          {supabase
-            ? "Identitas sesi dikelola oleh Supabase Auth."
-            : "Sesi guest memakai cookie bertanda tangan server. Login Google belum dikonfigurasi."}
-        </p>
-        <button className="secondary" onClick={logout}>
-          Keluar
-        </button>
+        <div className="credit-metric-box" style={{ margin: "16px 0", textAlign: "left" }}>
+          <small>SALDO KREDIT BOAI</small>
+          <div className="metric-val">🪙 {credits?.available ?? 100}</div>
+          <span className="metric-unit">BOAI_CREDIT (Virtual)</span>
+        </div>
+        {wallet.address && (
+          <div className="wallet-detail" style={{ margin: "12px 0" }}>
+            <small className="eyebrow">WALLET MONAD TESTNET</small>
+            <div className="mono" style={{ color: "#34d399", fontSize: "0.85rem" }}>
+              {wallet.address}
+            </div>
+          </div>
+        )}
+        <div className="button-row">
+          <Link to="/wallet" style={{ display: "inline-block", padding: "12px 18px", background: "var(--amber)", color: "var(--ink)", fontWeight: 900, textDecoration: "none", borderRadius: "3px" }}>
+            Kelola Dompet & Web3
+          </Link>
+          <button className="secondary" onClick={logout}>
+            Keluar
+          </button>
+        </div>
       </div>
     </main>
   );

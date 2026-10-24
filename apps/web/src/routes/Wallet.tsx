@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toHex } from 'viem'
-import type { WalletLink } from '@boai/shared/types'
+import type { CreditBalance, WalletLink } from '@boai/shared/types'
 import { api } from '../lib/api'
 import { useWallet, walletChainIsSupported } from '../lib/web3/useWallet'
 import { describeWalletError } from '../lib/web3/chain'
@@ -15,6 +15,32 @@ export function WalletPage() {
   const [step, setStep] = useState<LinkStep>('idle')
   const [link, setLink] = useState<WalletLink | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
+  const [credits, setCredits] = useState<CreditBalance | null>(null)
+  const [adStatus, setAdStatus] = useState<string | null>(null)
+
+  const fetchCredits = async () => {
+    try {
+      const res = await api.getCredits()
+      if (res && res.data) setCredits(res.data)
+    } catch {
+      // Guest or session pending
+    }
+  }
+
+  useEffect(() => {
+    void fetchCredits()
+  }, [])
+
+  const claimAdReward = async () => {
+    try {
+      setAdStatus('Memproses klaim simulasi iklan…')
+      const res = await api.claimDemoAdReward()
+      setCredits(res.data.balance)
+      setAdStatus('Berhasil! +25 BOAI_CREDIT telah ditambahkan ke dompet Anda.')
+    } catch (error) {
+      setAdStatus(error instanceof Error ? error.message : 'Klaim reward belum tersedia')
+    }
+  }
 
   const chainSupported = walletChainIsSupported(wallet.chainId)
 
@@ -48,11 +74,53 @@ export function WalletPage() {
 
   return (
     <main className="content narrow">
-      <p className="eyebrow">WEB3 · MONAD TESTNET</p>
-      <h1>Hubungkan wallet</h1>
+      {/* 1. In-game Credit Wallet Section */}
+      <section className="credit-wallet-panel">
+        <p className="eyebrow">DOMPET VIRTUAL IN-GAME · BOAI CREDITS</p>
+        <h2>Saldo Kredit Pemain</h2>
+        <p className="microcopy">
+          Kredit virtual in-game dipakai untuk memasang stake saat antrean PvP dan membeli kosmetik di Toko. Kredit ini
+          tidak dapat ditukar dengan uang nyata.
+        </p>
+
+        <div className="credit-metrics">
+          <div className="credit-metric-box">
+            <small>KREDIT TERSEDIA</small>
+            <div className="metric-val">🪙 {credits !== null ? credits.available : '100'}</div>
+            <span className="metric-unit">BOAI_CREDIT</span>
+          </div>
+          <div className="credit-metric-box">
+            <small>KREDIT TERTAHAN (QUEUE)</small>
+            <div className="metric-val">{credits !== null ? credits.reserved : '0'}</div>
+            <span className="metric-unit">BOAI_CREDIT</span>
+          </div>
+          <div className="credit-metric-box">
+            <small>STATUS PEMAIN</small>
+            <div className="metric-val" style={{ fontSize: '1.2rem', color: '#10b981' }}>AKTIF</div>
+            <span className="metric-unit">Starter: 100 Diberikan</span>
+          </div>
+        </div>
+
+        <div className="button-row">
+          <button onClick={() => void claimAdReward()}>
+            + Tonton Simulasi Iklan (+25 Kredit)
+          </button>
+          <a href="/shop" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 18px', border: '1px solid var(--amber)', color: 'var(--parchment)', textDecoration: 'none', borderRadius: '3px', fontWeight: 900, fontSize: '0.8rem', letterSpacing: '0.08em' }}>
+            Buka Toko Kosmetik
+          </a>
+          <a href="/practice" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 18px', border: '1px solid var(--line)', color: 'var(--parchment-soft)', textDecoration: 'none', borderRadius: '3px', fontWeight: 900, fontSize: '0.8rem', letterSpacing: '0.08em' }}>
+            Main Latihan
+          </a>
+        </div>
+        {adStatus && <div className="notice" style={{ marginTop: '12px' }}>{adStatus}</div>}
+      </section>
+
+      {/* 2. Monad Testnet Web3 Wallet Section */}
+      <p className="eyebrow">WEB3 ON-CHAIN · MONAD TESTNET</p>
+      <h1>Hubungkan Web3 Wallet</h1>
       <p className="lede">
-        Wallet hanya dipakai untuk menerima hadiah demo testnet. Bermain tidak memerlukan wallet, dan halaman ini
-        tidak pernah meminta private key atau seed phrase.
+        Wallet on-chain hanya dipakai untuk menerima token hadiah demo Monad Testnet (1 BOAI-DEMO per match). Bermain
+        tidak memerlukan wallet, dan halaman ini tidak pernah meminta private key atau seed phrase.
       </p>
 
       <TestnetBadge />
@@ -126,6 +194,9 @@ export function WalletPage() {
             <div className="button-row">
               <a className="button-link" href={`${MONAD_TESTNET_EXPLORER_URL}/address/${link.address}`}>
                 Lihat alamat di explorer ↗
+              </a>
+              <a href="/rewards" style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 16px', background: 'var(--amber)', color: 'var(--ink)', fontWeight: 900, textDecoration: 'none', borderRadius: '3px' }}>
+                Klaim Hadiah di Halaman Hadiah ↗
               </a>
             </div>
           </div>

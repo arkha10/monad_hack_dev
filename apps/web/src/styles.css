@@ -501,3 +501,130 @@ textarea { min-height: 82px; resize: vertical; }
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Header Right & Credit Wallet Badges */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: max-content;
+}
+
+.credit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--amber);
+  border-radius: 9999px;
+  background: rgba(233, 185, 78, 0.12);
+  color: var(--amber);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+.credit-pill:hover {
+  background: rgba(233, 185, 78, 0.25);
+  transform: translateY(-1px);
+  color: #fff1c6;
+}
+.credit-pill .coin-icon {
+  font-size: 0.95rem;
+}
+.credit-pill .credit-amount {
+  font-family: "Bahnschrift", monospace;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #fff;
+}
+.credit-pill .credit-label {
+  font-size: 0.62rem;
+  opacity: 0.85;
+}
+
+.wallet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.wallet-chip.connected {
+  border: 1px solid #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+.wallet-chip.connected:hover {
+  background: rgba(16, 185, 129, 0.22);
+  transform: translateY(-1px);
+}
+.wallet-chip.connect {
+  border: 1px dashed var(--line);
+  background: rgba(24, 36, 83, 0.6);
+  color: var(--parchment-soft);
+}
+.wallet-chip.connect:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--indigo-700);
+}
+.wallet-dot {
+  color: #10b981;
+  font-size: 0.65rem;
+}
+
+/* Credit Wallet Page Cards */
+.credit-wallet-panel {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: rgba(12, 20, 43, 0.94);
+  border: 2px solid var(--amber);
+  border-radius: 5px;
+}
+.credit-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.credit-metric-box {
+  padding: 16px;
+  background: rgba(24, 36, 83, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.credit-metric-box small {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--parchment-soft);
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+.credit-metric-box .metric-val {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--amber);
+  font-family: "Bahnschrift", monospace;
+  line-height: 1;
+}
+.credit-metric-box .metric-unit {
+  font-size: 0.72rem;
+  color: var(--parchment);
+  margin-left: 4px;
+}
+.credit-shop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  background: rgba(24, 36, 83, 0.6);
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+}
