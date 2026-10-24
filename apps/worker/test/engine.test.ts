@@ -84,10 +84,32 @@ describe('BOAI deterministic match engine', () => {
   it('counts stack pieces only for the rebuilding side', () => {
     const state = advanceTo(newMatch('seed-build'), 120).state
     const rebuildersAreRed = state.redRole === 'REBUILDERS'
-    const rebuildSideScore = rebuildersAreRed ? state.redScore : state.blueScore
     const hunterSideScore = rebuildersAreRed ? state.blueScore : state.redScore
-    expect(rebuildSideScore.buildCount).toBeGreaterThanOrEqual(0)
     expect(hunterSideScore.buildCount).toBe(0)
     expect(state.stack.completed).toBeLessThanOrEqual(state.stack.total)
+  })
+
+  it('actually builds the stack within the first half', () => {
+    const ticksPerHalf = MATCH.halfDurationMs / MATCH.tickMs
+    const state = advanceTo(newMatch('seed-build'), ticksPerHalf - 1).state
+    const rebuildSideScore = state.redRole === 'REBUILDERS' ? state.redScore : state.blueScore
+    expect(rebuildSideScore.buildCount).toBeGreaterThan(0)
+    expect(state.stack.completed).toBeGreaterThan(0)
+  })
+
+  it('never ends a match 0-0 across many seeds', () => {
+    const totalTicks = (MATCH.halfDurationMs * 2 + MATCH.halftimeDurationMs) / MATCH.tickMs + 5
+    const draws: string[] = []
+    for (let index = 0; index < 40; index += 1) {
+      const match = newMatch(`seed-sweep-${index}`)
+      match.agents = match.agents.map(agent =>
+        agent.side === 'blue'
+          ? { ...agent, behavior: agent.slot === 'p1' || agent.slot === 'p2' ? 'CHASE_BALL' : agent.behavior }
+          : agent,
+      )
+      const final = advanceTo(match, totalTicks).state
+      if (final.winnerSide === 'draw') draws.push(final.seed)
+    }
+    expect(draws).toEqual([])
   })
 })

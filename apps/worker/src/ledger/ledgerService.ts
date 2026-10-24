@@ -435,6 +435,19 @@ export class LedgerService {
     return { nonce, message, expiresAt: this.iso(expiresAtMs) }
   }
 
+  currentNonce(userId: string, address: string, nowMs: number): NonceResponse | null {
+    const row = one<{ address: string; nonce: string; message: string; expires_at: number; consumed: number }>(
+      this.sql,
+      'SELECT address, nonce, message, expires_at, consumed FROM wallet_nonce WHERE user_id = ?',
+      userId,
+    )
+    if (!row) return null
+    if (row.consumed !== 0) return null
+    if (row.expires_at <= nowMs) return null
+    if (row.address.toLowerCase() !== address.toLowerCase()) return null
+    return { nonce: row.nonce, message: row.message, expiresAt: this.iso(row.expires_at) }
+  }
+
   consumeNonce(userId: string, address: string, nonce: string, nowMs: number): boolean {
     return this.sql.transaction(() => {
       const rows = all<{ user_id: string }>(

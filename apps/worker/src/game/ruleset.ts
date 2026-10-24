@@ -44,7 +44,7 @@ export const AGENT_PHYSICS = {
   throwSpeed: 520,
   throwStaminaCost: 12,
   buildRadius: 46,
-  buildMsPerPiece: 1_200,
+  buildMsPerPiece: 8_000,
   collisionRadius: 26,
 } as const
 

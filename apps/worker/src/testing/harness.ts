@@ -2,7 +2,7 @@ import { devSessionCookie, issueDevSession } from '../auth/session'
 import { HttpError } from '../routes/http'
 import type { Env } from '../routes/env'
 
-export type DoHandler = (path: string, body: unknown, doName: string) => unknown
+export type DoHandler = (path: string, body: unknown, url: URL) => unknown
 
 export interface FakeEnvHandlers {
   ledger?: DoHandler
@@ -13,6 +13,7 @@ export interface FakeEnvHandlers {
 interface DoRequestPayload {
   path: string
   body: unknown
+  url: URL
 }
 
 function errorResponse(error: unknown): Response {
@@ -28,19 +29,20 @@ function errorResponse(error: unknown): Response {
 
 async function readPayload(request: Request): Promise<DoRequestPayload> {
   const text = await request.text()
-  return { path: new URL(request.url).pathname, body: text.length > 0 ? (JSON.parse(text) as unknown) : undefined }
+  const url = new URL(request.url)
+  return { path: url.pathname, url, body: text.length > 0 ? (JSON.parse(text) as unknown) : undefined }
 }
 
 function fakeNamespace(handler: DoHandler | undefined, label: string): DurableObjectNamespace {
   const namespace = {
     idFromName: (name: string) => name,
-    get: (name: string) => ({
+    get: () => ({
       fetch: async (request: Request): Promise<Response> => {
         if (!handler) return errorResponse(new HttpError('FAKE_DO_MISSING', `${label} tidak disiapkan di test`, 500))
         try {
-          const { path, body } = await readPayload(request)
-          const result = await handler(path, body, name)
-          if (result === undefined) return new Response(null, { status: 204 })
+          const { path, body, url } = await readPayload(request)
+          const result = await handler(path, body, url)
+          if (result === undefined) return errorResponse(new HttpError('FAKE_DO_UNHANDLED', `${label} tidak menangani ${path}`, 404))
           return Response.json(result)
         } catch (error) {
           return errorResponse(error)

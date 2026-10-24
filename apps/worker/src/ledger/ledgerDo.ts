@@ -115,6 +115,8 @@ export class LedgerDurableObject {
           return Response.json(
             ledger.consumeNonce(userId, text(body, 'address'), text(body, 'nonce'), integer(body, 'nowMs')),
           )
+        case '/nonce/current':
+          return Response.json(ledger.currentNonce(userId, text(body, 'address'), integer(body, 'nowMs')))
         case '/wallet/link':
           return Response.json(
             ledger.linkWallet(userId, asAddress(text(body, 'address')), integer(body, 'verifiedAtMs')),

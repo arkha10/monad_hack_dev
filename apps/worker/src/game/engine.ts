@@ -24,7 +24,6 @@ import {
   MATCH,
   ROLE_FOR_HALF,
   RULESET_VERSION,
-  SCORING,
   SIDE_SPAWN,
   SLOT_OFFSETS,
   STACK_CENTER,
@@ -58,6 +57,7 @@ export interface GameState {
   agents: EngineAgent[]
   ball: BallState & { inFlight: boolean; thrower: `${Side}:${AgentSlot}` | null }
   stack: StackState
+  buildProgressMs: number
   redScore: SideScore
   blueScore: SideScore
   winnerSide: Side | 'draw' | null
@@ -128,6 +128,8 @@ export interface CreateMatchInput {
 
 export function createGameState(input: CreateMatchInput): GameState {
   const roles = ROLE_FOR_HALF[1]
+  const firstHunter: Side = roles.red === 'HUNTERS' ? 'red' : 'blue'
+  const hunterSpawn = SIDE_SPAWN[firstHunter]
   return {
     matchId: input.matchId,
     mode: input.mode,
@@ -147,8 +149,15 @@ export function createGameState(input: CreateMatchInput): GameState {
       ...buildSide('red', input.redBehaviors, roles.red),
       ...buildSide('blue', input.blueBehaviors, roles.blue),
     ],
-    ball: { position: { x: 350, y: 300 }, velocity: { x: 0, y: 0 }, holder: null, inFlight: false, thrower: null },
+    ball: {
+      position: { x: hunterSpawn.x, y: hunterSpawn.y },
+      velocity: { x: 0, y: 0 },
+      holder: null,
+      inFlight: false,
+      thrower: null,
+    },
     stack: { position: { ...STACK_CENTER }, completed: 0, total: MATCH.stackPieces, knockedDown: true },
+    buildProgressMs: 0,
     redScore: emptyScore(),
     blueScore: emptyScore(),
     winnerSide: null,
@@ -210,7 +219,6 @@ function behaviorTarget(agent: EngineAgent, state: GameState, rng: Rng): { x: nu
   const role = roleFor(state, agent.side)
   const coachActive = state.coachSide === agent.side && state.tick < state.coachExpiresTick
   const coach = coachActive ? state.coachCommand : null
-  const stack = state.stack
   const ballLoose = state.ball.holder === null
 
   if (role === 'REBUILDERS') {
@@ -255,15 +263,19 @@ function behaviorTarget(agent: EngineAgent, state: GameState, rng: Rng): { x: nu
   if (ballLoose) {
     return { x: state.ball.position.x, y: state.ball.position.y, action: 'PICKUP_BALL' }
   }
+  const holderIsSelf = state.ball.holder === agentKey(agent)
+  if (holderIsSelf) {
+    const opponent = nearestOpponent(agent, state.agents)
+    if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
+    return { x: STACK_CENTER.x, y: STACK_CENTER.y, action: 'MOVE_TO' }
+  }
   const holderIsAlly = state.ball.holder?.startsWith(`${agent.side}:`) ?? false
   if (!holderIsAlly) {
     const opponent = nearestOpponent(agent, state.agents)
     if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'DODGE' }
   }
-  if (coach === 'ATTACK' && state.ball.holder === agentKey(agent)) {
-    const opponent = nearestOpponent(agent, state.agents)
-    if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
-  }
+  const opponent = nearestOpponent(agent, state.agents)
+  if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'MOVE_TO' }
   return { x: STACK_CENTER.x, y: STACK_CENTER.y, action: 'MOVE_TO' }
 }
 
@@ -365,7 +377,7 @@ function tryThrow(state: GameState, agent: EngineAgent, rng: Rng, events: MatchE
   if (ball.holder !== agentKey(agent)) return false
   if (agent.stamina < AGENT_PHYSICS.throwStaminaCost) return false
   if (agent.currentAction !== 'THROW') return false
-  const target = roleFor(state, agent.side) === 'HUNTERS' ? state.stack.position : nearestOpponent(agent, state.agents)?.position
+  const target = nearestOpponent(agent, state.agents)?.position
   if (!target) return false
   const distance = Math.hypot(target.x - agent.position.x, target.y - agent.position.y)
   if (distance > AGENT_PHYSICS.throwRange) return false
@@ -396,19 +408,13 @@ function resolveBuilding(state: GameState, dtMs: number, events: MatchEvent[]): 
     if (distance > AGENT_PHYSICS.buildRadius) continue
     builders += 1
     agent.currentAction = 'BUILD'
-    agent.buildProgressMs += dtMs
   }
   if (builders === 0) return
 
-  let progress = 0
-  for (const agent of state.agents) {
-    if (!agent.active) continue
-    if (roleFor(state, agent.side) !== 'REBUILDERS') continue
-    progress += agent.buildProgressMs
-    agent.buildProgressMs = 0
-  }
-  const pieces = Math.floor(progress / AGENT_PHYSICS.buildMsPerPiece)
+  state.buildProgressMs += builders * dtMs
+  const pieces = Math.floor(state.buildProgressMs / AGENT_PHYSICS.buildMsPerPiece)
   if (pieces <= 0) return
+  state.buildProgressMs -= pieces * AGENT_PHYSICS.buildMsPerPiece
   const side: Side = state.redRole === 'REBUILDERS' ? 'red' : 'blue'
   const applied = Math.min(pieces, stack.total - stack.completed)
   stack.completed += applied
@@ -437,7 +443,15 @@ function resetForHalf(state: GameState, half: 1 | 2): void {
   state.halfElapsedMs = 0
   state.phaseElapsedMs = 0
   state.stack = { position: { ...STACK_CENTER }, completed: 0, total: MATCH.stackPieces, knockedDown: true }
-  state.ball = { position: { x: 350, y: 300 }, velocity: { x: 0, y: 0 }, holder: null, inFlight: false, thrower: null }
+  const hunterSide: Side = roles.red === 'HUNTERS' ? 'red' : 'blue'
+  const hunterSpawn = SIDE_SPAWN[hunterSide]
+  state.ball = {
+    position: { x: hunterSpawn.x, y: hunterSpawn.y },
+    velocity: { x: 0, y: 0 },
+    holder: null,
+    inFlight: false,
+    thrower: null,
+  }
   state.coachCommand = null
   state.coachSide = null
   state.coachExpiresTick = 0
@@ -451,13 +465,30 @@ function resetForHalf(state: GameState, half: 1 | 2): void {
     agent.buildProgressMs = 0
     agent.dodgeUntilTick = 0
   }
+  state.buildProgressMs = 0
 }
 
 function finalize(state: GameState, events: MatchEvent[]): void {
-  state.winnerSide = calculateWinner(state.redScore, state.blueScore)
+  state.winnerSide = authoritativeWinner(state.redScore, state.blueScore)
   state.finishedAtMs = state.startedAtMs + state.tick * MATCH.tickMs
   transitionPhase(state, 'FINISHED', events)
   emit(state, events, 'MATCH_COMPLETE', null, { winnerSide: state.winnerSide })
+}
+
+/**
+ * SPEC.md B1 line 125 orders the tie-break as objective completion, then progress/time,
+ * then remaining players. The shared `calculateWinner` helper omits the time key, so it
+ * returns `draw` for two completed rebuilds. This is the authoritative scorer and it
+ * applies the documented time key before falling back to the shared helper.
+ */
+export function authoritativeWinner(red: SideScore, blue: SideScore): Side | 'draw' {
+  if (red.objectiveComplete !== blue.objectiveComplete) return red.objectiveComplete ? 'red' : 'blue'
+  if (red.objectiveComplete && blue.objectiveComplete) {
+    if (red.completionMs !== null && blue.completionMs !== null && red.completionMs !== blue.completionMs) {
+      return red.completionMs < blue.completionMs ? 'red' : 'blue'
+    }
+  }
+  return calculateWinner(red, blue)
 }
 
 export function advance(state: GameState, dtMs: number): TickOutput {
