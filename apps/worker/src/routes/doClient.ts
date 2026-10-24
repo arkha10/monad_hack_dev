@@ -44,11 +44,12 @@ async function callStub<T>(
   path: string,
   body: unknown,
   fetchImpl?: StubFetch,
+  extraHeaders: Record<string, string> = {},
 ): Promise<T> {
   const stub = namespace.get(namespace.idFromName(name))
   const request = new Request(`https://do.internal${path}`, {
     method: body === undefined ? 'GET' : 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...extraHeaders },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const response = await (fetchImpl ?? ((input: Request) => stub.fetch(input)))(request)
@@ -56,6 +57,17 @@ async function callStub<T>(
   if (!response.ok) throw toHttpError(response.status, text)
   if (text.length === 0) return undefined as T
   return JSON.parse(text) as T
+}
+
+export function saveMatchChainTxHash(env: Env, matchId: string, txHash: `0x${string}`): Promise<unknown> {
+  return callStub(
+    env.MATCHES,
+    matchId,
+    `/${encodeURIComponent(matchId)}/chain-tx`,
+    { txHash },
+    undefined,
+    { 'x-boai-internal-secret': env.CHAIN_INTERNAL_SECRET ?? '' },
+  )
 }
 
 /** The ledger DO reads userId from the body on every path, including its read-only ones. */

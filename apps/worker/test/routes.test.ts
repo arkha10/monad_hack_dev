@@ -82,12 +82,15 @@ describe('handleApiRequest dispatch', () => {
         return { userId, displayName: 'Pemain Tamu', isGuest: true, teamId: null }
       },
     })
+    env.BOAI_ENV = 'production'
+    env.CHAIN_INTERNAL_SECRET = 'production-session-test-secret'
 
     const first = await handleApiRequest(request('/api/v1/identity/sync', { method: 'POST' }), env)
     expect(first?.status).toBe(200)
     const cookie = first?.headers.get('set-cookie') as string
     expect(cookie).toContain('boai_session=')
     expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('Secure')
     const firstUserId = ((await envelope(first as Response)).data as { userId: string }).userId
     expect(firstUserId).toMatch(/^[0-9a-f-]{36}$/)
 
@@ -99,6 +102,22 @@ describe('handleApiRequest dispatch', () => {
     expect(second?.status).toBe(200)
     expect(second?.headers.get('set-cookie')).toBeNull()
     expect(((await envelope(second as Response)).data as { userId: string }).userId).toBe(firstUserId)
+  })
+
+  it('clears an authenticated guest cookie on signout', async () => {
+    const env = createFakeEnv({})
+    env.BOAI_ENV = 'production'
+    env.CHAIN_INTERNAL_SECRET = 'production-session-test-secret'
+    const cookie = await guestCookie(env, 'user-signout')
+
+    const response = await handleApiRequest(
+      request('/api/v1/identity/signout', { method: 'POST', headers: { cookie } }),
+      env,
+    )
+
+    expect(response?.status).toBe(200)
+    expect(response?.headers.get('set-cookie')).toContain('Max-Age=0')
+    expect(response?.headers.get('set-cookie')).toContain('Secure')
   })
 
   it('rejects an anonymous team read with 401 UNAUTHORIZED', async () => {

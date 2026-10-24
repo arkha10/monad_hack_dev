@@ -18,6 +18,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+function internalSecretMatches(provided: string | null, expected: string | undefined): boolean {
+  if (provided === null || !expected || provided.length !== expected.length) return false
+  let difference = 0
+  for (let index = 0; index < provided.length; index += 1) difference |= provided.charCodeAt(index) ^ expected.charCodeAt(index)
+  return difference === 0
+}
+
 function errorResponse(error: unknown): Response {
   if (error instanceof HttpError) {
     return Response.json(
@@ -181,6 +188,14 @@ export class MatchDurableObject {
     }
     if (route === 'winner' && method === 'GET') {
       return Response.json({ userId: this.service().authoritativeWinner(matchId) })
+    }
+    if (route === 'chain-tx' && method === 'POST') {
+      if (!internalSecretMatches(request.headers.get('x-boai-internal-secret'), this.env.CHAIN_INTERNAL_SECRET)) {
+        throw new HttpError('FORBIDDEN', 'Rute internal tidak dapat diakses', 403)
+      }
+      const body: unknown = await request.json()
+      const txHash = isRecord(body) && typeof body.txHash === 'string' ? body.txHash : ''
+      return Response.json(this.service().setChainTxHash(matchId, txHash as `0x${string}`))
     }
 
     throw new HttpError('NOT_FOUND', 'Rute Durable Object tidak dikenal', 404)

@@ -2,6 +2,7 @@ import type { AuthenticatedProfile, CoachCommand, Cosmetic, CreditBalance, Match
 import { SEED } from '@boai/shared/seed'
 import { verifyMessage } from 'viem'
 import {
+  clearDevSessionCookie,
   devSessionCookie,
   issueDevSession,
   requireIdentity,
@@ -142,6 +143,16 @@ function pairInit(pair: NonNullable<PairTakeResponse>): MatchInitRequest {
 }
 
 const ROUTES: readonly RouteDefinition[] = [
+  {
+    method: 'POST',
+    segments: ['identity', 'signout'],
+    identity: 'required',
+    handler: async ({ env }) => {
+      const response = ok({ signedOut: true }, env)
+      response.headers.append('set-cookie', clearDevSessionCookie(env.BOAI_ENV === 'production'))
+      return response
+    },
+  },
   {
     method: 'POST',
     segments: ['identity', 'sync'],
@@ -466,7 +477,7 @@ async function resolveRouteIdentity(
   const token = await issueDevSession(env, userId)
   return {
     identity: { userId, isGuest: true, displayName: 'Pemain Tamu', sessionToken: token },
-    cookie: devSessionCookie(token),
+    cookie: devSessionCookie(token, undefined, env.BOAI_ENV === 'production'),
   }
 }
 

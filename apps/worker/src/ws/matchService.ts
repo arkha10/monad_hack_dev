@@ -222,6 +222,16 @@ export class MatchService {
     return owner
   }
 
+  setChainTxHash(matchId: string, txHash: `0x${string}`): MatchResult {
+    if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new HttpError('INVALID_TX_HASH', 'Hash transaksi tidak valid', 400)
+    const result = this.loadResult(matchId)
+    if (!result) throw new HttpError('MATCH_NOT_FINISHED', 'Pertandingan belum selesai', 409)
+    if (result.chainTxHash !== null) return result
+    const updated = { ...result, chainTxHash: txHash }
+    run(this.sql, 'UPDATE match_result SET result_json = ? WHERE match_id = ?', JSON.stringify(updated), matchId)
+    return updated
+  }
+
   private buildResult(state: GameState, snapshot: MatchSnapshot): MatchResult {
     const eventHashes = all<EventRow>(
       this.sql,

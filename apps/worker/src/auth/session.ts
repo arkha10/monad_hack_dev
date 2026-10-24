@@ -19,8 +19,12 @@ function decodeBase64Url(value: string): Uint8Array {
 }
 
 async function hmacKey(env: Env): Promise<CryptoKey> {
-  const secret = env.CHAIN_INTERNAL_SECRET ?? 'boai-local-dev-secret-not-for-production'
-  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
+  const secret = env.CHAIN_INTERNAL_SECRET
+  if (!secret && env.BOAI_ENV === 'production') {
+    throw new HttpError('SESSION_SECRET_UNSET', 'Sesi guest belum dikonfigurasi di server', 503)
+  }
+  const keyMaterial = secret ?? 'boai-local-dev-secret-not-for-production'
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(keyMaterial), { name: 'HMAC', hash: 'SHA-256' }, false, [
     'sign',
     'verify',
   ])
@@ -88,6 +92,11 @@ export async function requireIdentity(request: Request, env: Env): Promise<Resol
   return identity
 }
 
-export function devSessionCookie(token: string, maxAgeSeconds = 60 * 60 * 24 * 7): string {
-  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}`
+export function devSessionCookie(token: string, maxAgeSeconds = 60 * 60 * 24 * 7, secure = false): string {
+  const secureAttribute = secure ? '; Secure' : ''
+  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secureAttribute}`
+}
+
+export function clearDevSessionCookie(secure = false): string {
+  return devSessionCookie('', 0, secure)
 }

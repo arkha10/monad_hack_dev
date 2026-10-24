@@ -3,6 +3,7 @@ export interface Env {
   MATCHES: DurableObjectNamespace
   LEDGER: DurableObjectNamespace
   WEB_ORIGIN: string
+  BOAI_ENV?: string
   SUPABASE_URL?: string
   SUPABASE_JWT_ISSUER?: string
   SUPABASE_JWT_AUDIENCE?: string

@@ -9,7 +9,9 @@ import { AddressChip } from '../components/web3/AddressChip'
 import { TestnetBadge } from '../components/web3/TestnetBadge'
 
 export function RewardsPage() {
-  const [matchId, setMatchId] = useState('')
+  const [matchId, setMatchId] = useState(() =>
+    typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('matchId') ?? '',
+  )
   const [claim, setClaim] = useState<RewardClaim | null>(null)
   const [failure, setFailure] = useState<RewardFailure | null>(null)
   const [busy, setBusy] = useState<'eligibility' | 'claim' | null>(null)
@@ -28,6 +30,7 @@ export function RewardsPage() {
     setBusy('eligibility')
     setFailure(null)
     try {
+      await api.getResult(id)
       const result = await api.getRewardEligibility(id)
       setClaim(result.data)
     } catch (error) {

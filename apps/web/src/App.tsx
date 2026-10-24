@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
-import { parseBehavior } from "@boai/shared/helpers";
+import type { MatchResult, MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
+import { buildExplorerTxUrl, parseBehavior } from "@boai/shared/helpers";
 import { SEED } from "@boai/shared/seed";
 import { API_BASE_URL, api } from "./lib/api";
-import { getSession, googleLogin, guestLogin, signOut } from "./lib/auth";
+import { getSession, googleLogin, guestLogin, signOut, supabase } from "./lib/auth";
 import { WalletPage } from "./routes/Wallet";
 import { RewardsPage } from "./routes/Rewards";
 
@@ -75,16 +75,17 @@ function Notice({
 }
 
 function Home() {
+  const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const login = async (kind: "guest" | "google") => {
     try {
       if (kind === "guest") await guestLogin();
       else await googleLogin();
-      setMessage(
-        kind === "guest"
-          ? "Guest siap. Lanjutkan ke editor tim."
-          : "Mengarahkan ke Google...",
-      );
+      if (kind === "guest") {
+        navigate("/team");
+        return;
+      }
+      setMessage("Mengarahkan ke Google...");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Login gagal");
     }
@@ -110,9 +111,15 @@ function Home() {
           <button onClick={() => login("guest")}>
             Masuk sebagai Guest <span>↗</span>
           </button>
-          <button className="secondary" onClick={() => login("google")}>
-            Masuk dengan Google
-          </button>
+          {supabase ? (
+            <button className="secondary" onClick={() => login("google")}>
+              Masuk dengan Google
+            </button>
+          ) : (
+            <button className="secondary" disabled>
+              Google belum dikonfigurasi
+            </button>
+          )}
         </div>
         {message && <Notice>{message}</Notice>}
         <p className="microcopy">
@@ -447,7 +454,7 @@ function MatchPage() {
         if (cancelled) return;
         setSnapshot(initial.data);
         const ticket = await api.createMatchSocketTicket(matchId);
-        const apiUrl = new URL(API_BASE_URL);
+        const apiUrl = new URL(API_BASE_URL || window.location.origin);
         const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
         socket = new WebSocket(
           `${protocol}//${apiUrl.host}/ws/v1/matches/${matchId}?ticket=${encodeURIComponent(ticket.data.ticket)}`,
@@ -607,10 +614,14 @@ function MatchPage() {
 function ResultsPage() {
   const { matchId = "unknown" } = useParams();
   const [status, setStatus] = useState("Memuat hasil");
+  const [result, setResult] = useState<MatchResult | null>(null);
   useEffect(() => {
     api
       .getResult(matchId)
-      .then(() => setStatus("Hasil terkonfirmasi server"))
+      .then((response) => {
+        setResult(response.data);
+        setStatus("Hasil terkonfirmasi server");
+      })
       .catch((error) =>
         setStatus(
           error instanceof Error ? error.message : "Hasil belum tersedia",
@@ -628,24 +639,33 @@ function ResultsPage() {
           alt="Menara Boi-boian runtuh"
         />
         <span className="result-mark">◆</span>
-        <h2>Menunggu finalisasi</h2>
+        <h2>
+          {result === null
+            ? "Menunggu finalisasi"
+            : result.winnerSide === "draw"
+              ? "Pertandingan seri"
+              : `Tim ${result.winnerSide === "red" ? "merah" : "biru"} menang`}
+        </h2>
         <p>{status}</p>
-        <div className="result-grid">
-          <span>
-            <b>RED</b> —
-          </span>
-          <span>
-            <b>BLUE</b> —
-          </span>
-          <span>
-            <b>HALVES</b> 2
-          </span>
-          <span>
-            <b>REPLAY</b> server digest
-          </span>
-        </div>
+        {result !== null ? (
+          <div className="result-grid">
+            <span><b>MERAH</b> {result.scores.red.buildCount} menara, {result.scores.red.eliminations} eliminasi</span>
+            <span><b>BIRU</b> {result.scores.blue.buildCount} menara, {result.scores.blue.eliminations} eliminasi</span>
+            <span><b>REPLAY</b> {result.replayHash.slice(0, 12)}…</span>
+            <span><b>RULESET</b> {result.rulesetHash.slice(0, 12)}…</span>
+            <span><b>FINAL</b> {result.finalizedAt}</span>
+            <span>
+              <b>MONAD</b>{" "}
+              {result.chainTxHash ? (
+                <a href={buildExplorerTxUrl(result.chainTxHash)} target="_blank" rel="noreferrer">
+                  Lihat transaksi ↗
+                </a>
+              ) : "Belum tercatat di chain"}
+            </span>
+          </div>
+        ) : null}
       </div>
-      <Link className="button-link" to="/rewards">
+      <Link className="button-link" to={`/rewards?matchId=${encodeURIComponent(matchId)}`}>
         Lihat opsi hadiah testnet ↗
       </Link>
     </main>
@@ -756,7 +776,11 @@ function ProfilePage() {
       <div className="panel profile-card">
         <span className="avatar">G</span>
         <h2>Guest Player</h2>
-        <p>Identitas sesi dikelola oleh Supabase Auth saat dikonfigurasi.</p>
+        <p>
+          {supabase
+            ? "Identitas sesi dikelola oleh Supabase Auth."
+            : "Sesi guest memakai cookie bertanda tangan server. Login Google belum dikonfigurasi."}
+        </p>
         <button className="secondary" onClick={logout}>
           Keluar
         </button>
