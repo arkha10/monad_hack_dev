@@ -32,7 +32,7 @@
 
 ### Branch / commit / PR
 - Branch: `agent-b/backend`, based on `7612388` (Phase0 `f93769c` plus Agent A frontend).
-- Commits: `d743c96` (engine, ledger, matchmaker), `113ea7d` (routes, websocket, authoritative scoring).
+- Commits: `d743c96` (engine, ledger, matchmaker), `113ea7d` (routes, websocket, authoritative scoring), `4327855` (task notes), `172ff66` (Durable Object `transactionSync` adapter), `ef05aa5` (HTTP read catch-up), `7cac18d` (first stack completion kept for tie-breaks), plus a docs commit recording the runtime fixes and the chain env keys.
 - PR: not opened. The lead opens it at integration; see "Lead-owned changes" below for the files that are not mine.
 
 ### Worker URL / Durable Object bindings
@@ -54,14 +54,20 @@
 ```
 npm run lint        -> exit 0
 npm run typecheck   -> exit 0
-npm run build       -> exit 0, Total Upload 257.47 KiB
-npm test            -> 7 files, 107 tests passed
+npm run build       -> exit 0, Total Upload 259.27 KiB / gzip 65.16 KiB
+npm test            -> 7 files, 109 tests passed
 ```
-Per-slice observed output during development: engine 9/9, ledger 26/26, matchmaker 17/17, match/ws 30/30, routes 22/22.
+Per-slice observed output during development: engine 10/10, ledger 26/26, matchmaker 17/17, match/ws 30/30, routes 22/22.
 
 Two real defects were found by parallel review and fixed by the lead, both in `game/engine.ts`:
 1. `resolveBuilding` accumulated build progress into a per-agent field and zeroed it every tick, so the stack never built and every match ended 0-0. Fixed with a team-level accumulator; the test that hid it (`toBeGreaterThanOrEqual(0)`) was replaced with `toBeGreaterThan(0)` plus a 40-seed draw sweep.
 2. `CHASE_BALL` was used as an `AgentAction` in three places; it is a `Behavior`. Fixed to `PICKUP_BALL`.
+
+Three more defects were found only by running the Worker live, not by the unit suite:
+
+3. Durable Object SQL transactions never ran. Cloudflare names the synchronous transaction `transactionSync`, but `ledgerDo.ts` and `matchDo.ts` cast `state.storage.sql` straight to `SqlStore`, whose test fake implements `transaction`. Every DO call failed at runtime with `this.sql.transaction is not a function`. Fixed with a `durableObjectSql(state)` adapter in `storage/sql.ts` that converts `transaction` to `transactionSync` and rejects ArrayBuffer rows; `ledgerDo.ts` and `matchDo.ts` import it, and the test fakes now expose `transactionSync` so the mismatch cannot come back. Commit `172ff66`. Known residue: `matchmakerDo.ts` still carries a byte-identical private copy of the adapter instead of importing the shared one, so it can drift; folding it in is a follow-up.
+4. A match started over plain HTTP never advanced, because the tick interval only started on a WebSocket upgrade. `/view` and `/events` now catch up to the wall clock on read. Test: "advances a match read over plain HTTP with no socket attached". Commit `ef05aa5`.
+5. `completionMs` was overwritten by a rebuild. The stack can be knocked down and rebuilt inside one half, so red could show a completion at 73 000 ms when it actually completed near 10 000 ms; `authoritativeWinner` compares `completionMs` to break ties between two sides that both completed. `resolveBuilding` now records the first completion only and ignores later rebuilds. Regression test: "keeps the first stack completion time when the stack is knocked down and rebuilt". It uses seed `s-67`, where red completes at 13 600 ms, blue knocks the stack down at 16 100 ms and red rebuilds it at 24 200 ms. The test asserts red has more than one full stack with a knockdown in between, then requires the stored time to equal the first `STACK_COMPLETE`. With the guard reverted the test fails with `expected 24200 to be 13600`; with the guard restored it passes. Commit `7cac18d`.
 
 ### Known limitations
 - The 101 WebSocket upgrade path cannot be unit tested in Node because `WebSocketPair` only exists in workerd. The ticket-burn rule is asserted instead. A real two-browser WSS check still requires a deployed Worker.
@@ -73,7 +79,7 @@ Two real defects were found by parallel review and fixed by the lead, both in `g
 - Agent C imports `getAuthoritativeWinner` and `getVerifiedLinkedWallet` from `apps/worker/src/routes/authority.ts`. Both satisfy the frozen `AuthoritativeGameLookup` shape.
 - Agent B calls `ChainAdapter.recordMatch` nowhere yet: `apps/worker/src/chain/**` is C-owned and is not present on this branch, so finalization currently leaves `chainTxHash` as `null`. This is the one unmet Phase 1 item above and it is deliberately deferred to the integration merge.
 - Lead-owned files this branch touches, all requiring sign-off: `apps/worker/src/index.ts` (locked; rewrote to delegate to `handleApiRequest`, export the three DO classes, and forward `/ws/v1/matches/*`). The chain mount is intentionally left as a labelled 501 on this branch so it builds without C's module.
-- Lead still needs to: mount `handleChainRequest` for `/api/v1/chain/*`, wire `WalletPage`/`RewardsPage` in the locked `App.tsx`, and add `CHAIN_INTERNAL_SECRET`, `CHAIN_RELAYER_PRIVATE_KEY`, `BOAI_COMMITMENT_SALT`, `MONAD_RPC_URL`, `MONAD_CHAIN_ID`, `BOAI_CONTRACT_ADDRESS` to the locked `.env.example`.
+- Lead still needs to: mount `handleChainRequest` for `/api/v1/chain/*` and wire `WalletPage`/`RewardsPage` in the locked `App.tsx`. The six chain keys (`CHAIN_INTERNAL_SECRET`, `CHAIN_RELAYER_PRIVATE_KEY`, `BOAI_COMMITMENT_SALT`, `MONAD_RPC_URL`, `MONAD_CHAIN_ID`, `BOAI_CONTRACT_ADDRESS`) are now in the locked `.env.example` with lead sign-off and empty values; only the non-secret testnet RPC URL and chain id are filled in.
 - Client contract note: the frozen `apps/web/src/lib/api.ts` `linkWallet` sends only `{address, signature}`. B resolves this server-side by re-serving the issued message from `LedgerDO /nonce/current` and verifying the signature against it, so no client change is required and nonce replay protection is intact.
 
 ### Status
