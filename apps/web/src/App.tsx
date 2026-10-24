@@ -15,6 +15,15 @@ const links = [
   ["/profile", "Profil"],
 ] as const;
 
+const navGlyphs: Record<(typeof links)[number][0], string> = {
+  "/team": "◆",
+  "/practice": "↯",
+  "/queue": "◎",
+  "/leaderboard": "✦",
+  "/shop": "▣",
+  "/profile": "◉",
+};
+
 function Shell({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(false);
   useEffect(() => {
@@ -33,6 +42,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <nav>
           {links.map(([path, label]) => (
             <Link key={path} to={path}>
+              <span className="nav-glyph" aria-hidden="true">{navGlyphs[path]}</span>
               {label}
             </Link>
           ))}
@@ -74,19 +84,21 @@ function Home() {
     }
   };
   return (
-    <main className="hero">
+    <>
+      <main className="hero">
       <section>
         <p className="eyebrow">
-          INDONESIAN TRADITIONAL GAME · AGENT SIMULATION
+          PERMAINAN RAKYAT SUNDA · AGENT SIMULATION
         </p>
         <h1>
-          Susun strategi.
+          Jatuhkan genteng.
           <br />
-          <em>Jatuhkan menara.</em>
+          <em>Bangun kembali.</em>
         </h1>
         <p className="lede">
-          Arena Boi-boian 5 lawan 5 dengan lima agen deterministik yang
-          mengikuti prompt dan arahan coach Anda.
+          BOAI adalah arena Boi-boian online 5 lawan 5. Lima agent deterministik
+          membaca prompt Anda, mengejar bola, menjaga tumpukan, dan membangun
+          kembali menara genteng.
         </p>
         <div className="hero-actions">
           <button onClick={() => login("guest")}>
@@ -143,7 +155,23 @@ function Home() {
           </span>
         </div>
       </section>
-    </main>
+      </main>
+      <section className="content home-rules">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">BOI-BOIAN · ADAPTASI DIGITAL</p>
+          <h2>Dua tim. Satu tumpukan.</h2>
+          <p className="muted">Terinspirasi permainan rakyat Jawa Barat. Aturan BOAI adalah adaptasi produk, bukan klaim satu-satunya versi historis.</p>
+        </div>
+        <span className="badge">TESTNET · TANPA NILAI UANG</span>
+      </div>
+      <div className="home-rule-grid">
+        <article className="panel rule-card"><img src="/art/boai-stack-states.png" alt="Enam keadaan tumpukan genteng Boi-boian" /><h3>Robohkan</h3><p>Lempar bola ke tumpukan genteng dari jarak yang disepakati.</p></article>
+        <article className="panel rule-card"><img src="/art/boai-vfx.png" alt="Efek pixel bola kain saat dilempar" /><h3>Hindari</h3><p>Tim lawan mengejar dan melempar bola sementara tim Anda bergerak.</p></article>
+        <article className="panel rule-card"><img src="/art/boai-badges.png" alt="Badge tile, bola, bambu, dan teamwork BOAI" /><h3>Bangun</h3><p>Susun kembali menara. Skor tercatat setelah server menyelesaikan ronde.</p></article>
+      </div>
+      </section>
+    </>
   );
 }
 
@@ -519,8 +547,8 @@ function MatchPage() {
                         left: `${agent.position.x * 100}%`,
                         top: `${agent.position.y * 100}%`,
                         borderColor:
-                          agent.side === "red" ? "#ef916f" : "#b3f77f",
-                        color: agent.side === "red" ? "#ef916f" : "#b3f77f",
+                          agent.side === "red" ? "#d86122" : "#e9b94e",
+                        color: agent.side === "red" ? "#d86122" : "#e9b94e",
                       }}
                     >
                       {agent.slot}
