@@ -17,14 +17,14 @@ import { WalletPage } from "./routes/Wallet";
 import { RewardsPage } from "./routes/Rewards";
 
 const links = [
-  ["/team", "Tim"],
-  ["/practice", "Latihan"],
-  ["/queue", "Antrean"],
-  ["/leaderboard", "Peringkat"],
-  ["/shop", "Toko"],
-  ["/profile", "Profil"],
+  ["/team", "Team"],
+  ["/practice", "Practice"],
+  ["/queue", "Queue"],
+  ["/leaderboard", "Leaderboard"],
+  ["/shop", "Shop"],
+  ["/profile", "Profile"],
   ["/wallet", "Wallet"],
-  ["/rewards", "Hadiah"],
+  ["/rewards", "Rewards"],
 ] as const;
 
 const navGlyphs: Record<(typeof links)[number][0], string> = {
@@ -94,10 +94,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="header-right">
-          <Link to="/wallet" className="credit-pill" title="Saldo Kredit BOAI (Klik untuk kelola Dompet)">
+          <Link to="/wallet" className="credit-pill" title="BOAI Credit Balance (Click to manage Wallet)">
             <span className="coin-icon">🪙</span>
             <span className="credit-amount">{credits !== null ? credits.available : '100'}</span>
-            <span className="credit-label">KREDIT</span>
+            <span className="credit-label">CREDITS</span>
           </Link>
 
           {wallet.address !== null ? (
@@ -106,9 +106,9 @@ function Shell({ children }: { children: React.ReactNode }) {
               <span className="mono">{wallet.address.slice(0, 6)}…{wallet.address.slice(-4)}</span>
             </Link>
           ) : (
-            <Link to="/wallet" className="wallet-chip connect" title="Hubungkan Monad Testnet Wallet">
+            <Link to="/wallet" className="wallet-chip connect" title="Connect Monad Testnet Wallet">
               <span>⚡</span>
-              <span>Hubungkan Wallet</span>
+              <span>Connect Wallet</span>
             </Link>
           )}
 
@@ -125,7 +125,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       {children}
       <footer>
         <span>BOAI_CREDIT · VIRTUAL · NONREDEEMABLE</span>
-        <span>TESTNET · TANPA NILAI UANG</span>
+        <span>TESTNET · NO MONETARY VALUE</span>
       </footer>
     </div>
   );
@@ -167,21 +167,21 @@ function Home() {
 
     const cleanUsername = username.trim();
     if (!cleanUsername) {
-      setErrorMessage("Silakan masukkan username");
+      setErrorMessage("Please enter a username");
       return;
     }
     if (!/^[a-zA-Z0-9_-]{3,20}$/.test(cleanUsername)) {
-      setErrorMessage("Username harus 3-20 karakter alfanumerik (huruf, angka, _, -)");
+      setErrorMessage("Username must be 3-20 alphanumeric characters (letters, numbers, _, -)");
       return;
     }
     if (password.length < 6) {
-      setErrorMessage("Password minimal 6 karakter");
+      setErrorMessage("Password must be at least 6 characters");
       return;
     }
 
     if (authMode === "register") {
       if (password !== confirmPassword) {
-        setErrorMessage("Konfirmasi kata sandi tidak cocok");
+        setErrorMessage("Password confirmation does not match");
         return;
       }
     }
@@ -190,15 +190,15 @@ function Home() {
     try {
       if (authMode === "register") {
         const user = await authRegister(cleanUsername, password);
-        setSuccessMessage(`Akun @${user.username} berhasil didaftarkan! Mengarahkan ke arena...`);
+        setSuccessMessage(`Account @${user.username} created! Redirecting to arena...`);
         setTimeout(() => navigate("/team"), 800);
       } else {
         const user = await authLogin(cleanUsername, password);
-        setSuccessMessage(`Selamat datang kembali, @${user.username}! Mengarahkan...`);
+        setSuccessMessage(`Welcome back, @${user.username}! Redirecting...`);
         setTimeout(() => navigate("/team"), 600);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Autentikasi gagal");
+      setErrorMessage(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setLoading(false);
     }
@@ -211,7 +211,7 @@ function Home() {
       await guestLogin();
       navigate("/team");
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Gagal masuk sebagai tamu");
+      setErrorMessage(err instanceof Error ? err.message : "Failed to enter as guest");
     } finally {
       setLoading(false);
     }
@@ -237,18 +237,18 @@ function Home() {
 
         {currentUser?.username ? (
           <div className="hero-auth-box logged-in">
-            <p className="welcome-tag">AKUN AKTIF</p>
-            <h3>Selamat Datang, @{currentUser.username}</h3>
-            <p className="muted" style={{ margin: "8px 0" }}>Akun Anda siap untuk bermain Boi-boian PvP atau Latihan.</p>
+            <p className="welcome-tag">ACTIVE ACCOUNT</p>
+            <h3>Welcome Back, @{currentUser.username}</h3>
+            <p className="muted" style={{ margin: "8px 0" }}>Your account is ready for 5v5 Boi-boian PvP or Practice matches.</p>
             <div className="hero-actions" style={{ marginTop: "14px" }}>
               <button onClick={() => navigate("/team")}>
-                Lanjut ke Tim Saya <span>➔</span>
+                Go to My Squad <span>➔</span>
               </button>
               <button className="secondary" onClick={() => navigate("/practice")}>
-                Main Latihan
+                Practice Arena
               </button>
               <button className="secondary" onClick={() => navigate("/profile")}>
-                Lihat Profil
+                Player Profile
               </button>
             </div>
           </div>
@@ -264,7 +264,7 @@ function Home() {
                   setSuccessMessage("");
                 }}
               >
-                Masuk Akun
+                Sign In
               </button>
               <button
                 type="button"
@@ -275,7 +275,7 @@ function Home() {
                   setSuccessMessage("");
                 }}
               >
-                Daftar Baru
+                Register
               </button>
             </div>
 
@@ -300,7 +300,7 @@ function Home() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimal 6 karakter"
+                  placeholder="Min. 6 characters"
                   autoComplete={authMode === "register" ? "new-password" : "current-password"}
                   required
                 />
@@ -308,13 +308,13 @@ function Home() {
 
               {authMode === "register" && (
                 <div className="form-group">
-                  <label htmlFor="auth-confirm">Konfirmasi Password</label>
+                  <label htmlFor="auth-confirm">Confirm Password</label>
                   <input
                     id="auth-confirm"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Ulangi kata sandi"
+                    placeholder="Repeat password"
                     autoComplete="new-password"
                     required
                   />
@@ -325,8 +325,8 @@ function Home() {
                 {loading
                   ? "Memproses..."
                   : authMode === "login"
-                  ? "Masuk ke Arena ➔"
-                  : "Daftar Akun Baru ➔"}
+                  ? "Enter Arena ➔"
+                  : "Create New Account ➔"}
               </button>
             </form>
 
@@ -334,17 +334,16 @@ function Home() {
             {successMessage && <Notice tone="info">{successMessage}</Notice>}
 
             <div className="guest-fallback">
-              <span className="muted">Atau coba langsung tanpa daftar:</span>
+              <span className="muted">Or try instantly without registration:</span>
               <button type="button" className="guest-link-btn" onClick={handleGuestLogin} disabled={loading}>
-                Masuk sebagai Guest (Tamu) ↗
+                Enter as Guest ↗
               </button>
             </div>
           </div>
         )}
 
         <p className="microcopy">
-          AI Agent di BOAI adalah simulasi rule based yang dapat dijelaskan.
-          Tidak ada LLM aktif.
+          AI Agents in BOAI run on an explainable, deterministic rule-based simulation. No active LLMs during matches.
         </p>
       </section>
       <section className="hero-card">
@@ -393,8 +392,8 @@ function Home() {
       <div className="page-head">
         <div>
           <p className="eyebrow">BOI-BOIAN · ADAPTASI DIGITAL</p>
-          <h2>Dua tim. Satu tumpukan.</h2>
-          <p className="muted">Terinspirasi permainan rakyat Jawa Barat. Aturan BOAI adalah adaptasi produk, bukan klaim satu-satunya versi historis.</p>
+          <h2>Two teams. One stack.</h2>
+          <p className="muted">Inspired by the traditional folk game of West Java. BOAI rules are a competitive digital adaptation.</p>
         </div>
         <span className="badge">TESTNET · TANPA NILAI UANG</span>
       </div>
@@ -440,36 +439,35 @@ function TeamPage() {
       const result = await api.getTeam();
       setName(result.data.name);
       setAgents(result.data.agents);
-      setStatus("Tim dimuat dari server");
+      setStatus("Squad loaded from server");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Tim belum tersedia");
+      setStatus(error instanceof Error ? error.message : "Squad not available yet");
     }
   };
   const save = async () => {
     try {
       await api.saveTeam({ name, agents });
-      setStatus("Tim tersimpan");
+      setStatus("Squad saved successfully");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Gagal menyimpan tim");
+      setStatus(error instanceof Error ? error.message : "Failed to save squad");
     }
   };
   return (
     <main className="content">
       <div className="page-head">
         <div>
-          <p className="eyebrow">TEAM BUILDER · 5 SLOT</p>
-          <h1>Bangun tim Anda</h1>
+          <p className="eyebrow">TEAM BUILDER · 5 SLOTS</p>
+          <h1>Build your squad</h1>
           <p>
-            Tulis instruksi singkat. Parser akan memilih strategi simulasi yang
-            terlihat di arena.
+            Write concise instructions. The parser translates your prompts into deterministic simulation strategies visible in the arena.
           </p>
         </div>
-        <span className="badge">SIMULASI AI AGENT</span>
+        <span className="badge">AI AGENT SIMULATION</span>
       </div>
       <div className="team-layout">
         <section className="panel form-panel">
           <label>
-            Nama tim
+            Squad name
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -481,7 +479,7 @@ function TeamPage() {
               <div className="agent-number">0{index + 1}</div>
               <div className="agent-fields">
                 <label>
-                  Nama agent
+                  Agent name
                   <input
                     value={agent.name}
                     onChange={(event) =>
@@ -491,7 +489,7 @@ function TeamPage() {
                   />
                 </label>
                 <label>
-                  Prompt strategi
+                  Strategy prompt
                   <textarea
                     value={agent.text}
                     onChange={(event) =>
@@ -502,25 +500,24 @@ function TeamPage() {
                 </label>
                 <span className="strategy">
                   {agent.behavior.replaceAll("_", " ")}{" "}
-                  <small>deterministik</small>
+                  <small>deterministic</small>
                 </span>
               </div>
             </article>
           ))}
           <div className="button-row">
-            <button onClick={save}>Simpan tim</button>
+            <button onClick={save}>Save Squad</button>
             <button className="secondary" onClick={load}>
-              Muat dari server
+              Load from Server
             </button>
           </div>
           {status && <Notice>{status}</Notice>}
         </section>
         <aside className="panel side-panel">
-          <p className="eyebrow">ATURAN BOAI</p>
-          <h2>Prompt menjadi kebiasaan</h2>
+          <p className="eyebrow">BOAI RULES</p>
+          <h2>Prompts become behaviors</h2>
           <p>
-            Prompt dipetakan ke vocabulary yang dibekukan. Instruksi yang belum
-            dikenali memakai perilaku BALANCED.
+            Prompts are mapped to a frozen behavior vocabulary. Unrecognized instructions default to BALANCED behavior.
           </p>
           <ul>
             <li>BUILD_FIRST</li>
@@ -535,7 +532,7 @@ function TeamPage() {
             alt="Empat pilihan skin agent"
           />
           <p className="muted">
-            Semua agent memiliki physics stat yang sama. Skin hanya kosmetik.
+            All agents share identical physics stats. Skins are purely cosmetic.
           </p>
         </aside>
       </div>
@@ -563,10 +560,9 @@ function PracticePage() {
   return (
     <main className="content narrow">
       <p className="eyebrow">PRACTICE LAB · SERVER AUTHORITATIVE</p>
-      <h1>Uji strategi tim</h1>
+      <h1>Test squad strategies</h1>
       <p>
-        Pilih preset lawan. Difficulty mengubah kebijakan bot, bukan statistik
-        fisik agent.
+        Select an opponent preset. Difficulty alters bot policies, not physical agent stats.
       </p>
       <img
         className="practice-art"
@@ -585,16 +581,16 @@ function PracticePage() {
             <b>{value.toUpperCase()}</b>
             <span>
               {value === "easy"
-                ? "Lawan santai"
+                ? "Relaxed opponent"
                 : value === "medium"
-                  ? "Pertandingan seimbang"
-                  : "Tekanan tinggi"}
+                  ? "Balanced match"
+                  : "High pressure"}
             </span>
           </button>
         ))}
       </div>
       <button onClick={start}>
-        Mulai practice <span>↗</span>
+        Start Practice <span>↗</span>
       </button>
       {status && <Notice tone="error">{status}</Notice>}
     </main>
@@ -604,7 +600,7 @@ function PracticePage() {
 function QueuePage() {
   const navigate = useNavigate();
   const [ticket, setTicket] = useState("");
-  const [status, setStatus] = useState("Belum masuk antrean");
+  const [status, setStatus] = useState("Not in queue");
   const join = async () => {
     try {
       const team = await api.getTeam();
@@ -612,11 +608,11 @@ function QueuePage() {
       setTicket(result.data.queueTicket);
       setStatus(
         result.data.status === "matched"
-          ? "Lawan ditemukan"
-          : "Menunggu lawan manusia",
+          ? "Opponent found"
+          : "Waiting for human opponent",
       );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Antrean gagal");
+      setStatus(error instanceof Error ? error.message : "Queue failed");
     }
   };
   useEffect(() => {
@@ -626,20 +622,20 @@ function QueuePage() {
         const result = await api.getQueueStatus(ticket);
         setStatus(
           result.data.status === "waiting"
-            ? "Menunggu lawan manusia"
+            ? "Waiting for human opponent"
             : result.data.status,
         );
         if (result.data.matchId) navigate(`/match/${result.data.matchId}`);
       } catch {
-        setStatus("Status antrean belum dapat dimuat");
+        setStatus("Unable to load queue status");
       }
     }, 3000);
     return () => window.clearInterval(timer);
   }, [ticket, navigate]);
   return (
     <main className="content narrow">
-      <p className="eyebrow">PVP QUEUE · TWO HUMAN OWNERS</p>
-      <h1>Temukan lawan</h1>
+      <p className="eyebrow">PVP QUEUE · TWO HUMAN PLAYERS</p>
+      <h1>Find an opponent</h1>
       <div className="queue-card">
         <img
           className="queue-art"
@@ -648,13 +644,12 @@ function QueuePage() {
         />
         <span className="queue-icon">◎</span>
         <h2>{status}</h2>
-        <p>BOAI tidak mengganti lawan yang belum hadir dengan bot.</p>
-        {!ticket && <button onClick={join}>Masuk antrean</button>}
-        {ticket && <span className="badge">TICKET AKTIF</span>}
+        <p>BOAI does not replace missing opponents with silent bots.</p>
+        {!ticket && <button onClick={join}>Join Matchmaking Queue</button>}
+        {ticket && <span className="badge">TICKET ACTIVE</span>}
       </div>
       <Notice>
-        Saldo taruhan hanya BOAI_CREDIT virtual. Nilainya Rp0 dan tidak dapat
-        dicairkan.
+        Stakes use virtual BOAI_CREDIT only. Value is $0 and non-redeemable.
       </Notice>
     </main>
   );
@@ -663,7 +658,7 @@ function QueuePage() {
 function MatchPage() {
   const { matchId = "unknown" } = useParams();
   const [coach, setCoach] = useState("");
-  const [status, setStatus] = useState("Menghubungkan ke server match...");
+  const [status, setStatus] = useState("Connecting to match server...");
   const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
 
   useEffect(() => {
@@ -683,7 +678,7 @@ function MatchPage() {
         if (!cancelled && res.data) {
           setSnapshot(res.data);
           if (res.data.phase === "FINISHED") {
-            setStatus("Pertandingan selesai! Siap melihat hasil.");
+            setStatus("Match completed! Ready to view results.");
           }
         }
       } catch {
@@ -701,26 +696,26 @@ function MatchPage() {
           `${protocol}//${apiUrl.host}/ws/v1/matches/${matchId}?ticket=${encodeURIComponent(ticket.data.ticket)}`,
         );
         socket.onopen = () => {
-          setStatus("WebSocket authoritative tersambung");
+          setStatus("Authoritative WebSocket connected");
           socket?.send(JSON.stringify({ type: "CLIENT_READY", matchId }));
         };
         socket.onmessage = (event) => {
           const message = JSON.parse(event.data) as ServerWsMessage;
           if (message.type === "MATCH_SNAPSHOT") setSnapshot(message.snapshot);
           if (message.type === "MATCH_COMPLETE") {
-            setStatus("Pertandingan selesai");
+            setStatus("Match completed");
           }
           if (message.type === "COACH_ACK") {
             setStatus(
               message.accepted
-                ? "Arahan coach diterima"
-                : `Arahan ditolak: ${message.reason ?? "aturan match"}`,
+                ? "Coach directive accepted"
+                : `Directive rejected: ${message.reason ?? "match rules"}`,
             );
           }
           if (message.type === "ERROR") setStatus(message.message);
         };
         socket.onerror = () => {
-          setStatus("Sinkronisasi live via server aktif.");
+          setStatus("Live server synchronization active.");
         };
         socket.onclose = () => {
           if (!cancelled) setStatus("Sinkronisasi live via server aktif.");
@@ -743,8 +738,8 @@ function MatchPage() {
       const result = await api.sendCoach(matchId, cmd);
       setStatus(
         result.data.accepted
-          ? `Coach ${cmd} diterima server`
-          : `Coach ${cmd} ditolak`,
+          ? `Coach ${cmd} accepted by server`
+          : `Coach ${cmd} rejected`,
       );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Coach gagal dikirim");
@@ -755,7 +750,7 @@ function MatchPage() {
     const command = coach.trim().toUpperCase() as
       "ATTACK" | "DEFEND" | "REBUILD" | "DISTRACT";
     if (!["ATTACK", "DEFEND", "REBUILD", "DISTRACT"].includes(command)) {
-      setStatus("Gunakan ATTACK, DEFEND, REBUILD, atau DISTRACT");
+      setStatus("Use ATTACK, DEFEND, REBUILD, or DISTRACT");
       return;
     }
     await sendCommand(command);
@@ -790,19 +785,19 @@ function MatchPage() {
       {snapshot && (
         <div className="arena-hud">
           <div className="hud-team red">
-            <span className="hud-team-name">TIM MERAH</span>
+            <span className="hud-team-name">RED SQUAD</span>
             <span className="hud-team-role">
-              {snapshot.redRole === "REBUILDERS" ? "🧱 REBUILDER (Menyusun)" : "🎯 HUNTER (Melempar Bola)"}
+              {snapshot.redRole === "REBUILDERS" ? "🧱 REBUILDER (Stacking)" : "🎯 HUNTER (Throwing Ball)"}
             </span>
             <div className="hud-stats">
-              <span>Menara: <b>{snapshot.redScore.buildCount}</b></span>
-              <span>Eliminasi: <b>{snapshot.redScore.eliminations}</b></span>
-              <span>Aktif: <b>{snapshot.agents.filter(a => a.side === 'red' && a.active).length}/5</b></span>
+              <span>Towers: <b>{snapshot.redScore.buildCount}</b></span>
+              <span>Eliminations: <b>{snapshot.redScore.eliminations}</b></span>
+              <span>Active: <b>{snapshot.agents.filter(a => a.side === 'red' && a.active).length}/5</b></span>
             </div>
           </div>
 
           <div className="hud-center">
-            <span className="hud-half">BABAK {snapshot.half} / 2</span>
+            <span className="hud-half">HALF {snapshot.half} / 2</span>
             <div className="hud-timer">
               {Math.floor(snapshot.remainingMs / 60000)}:{String(Math.floor((snapshot.remainingMs % 60000) / 1000)).padStart(2, "0")}
             </div>
@@ -810,14 +805,14 @@ function MatchPage() {
           </div>
 
           <div className="hud-team blue">
-            <span className="hud-team-name">TIM BIRU</span>
+            <span className="hud-team-name">BLUE SQUAD</span>
             <span className="hud-team-role">
-              {snapshot.blueRole === "REBUILDERS" ? "🧱 REBUILDER (Menyusun)" : "🎯 HUNTER (Melempar Bola)"}
+              {snapshot.blueRole === "REBUILDERS" ? "🧱 REBUILDER (Stacking)" : "🎯 HUNTER (Throwing Ball)"}
             </span>
             <div className="hud-stats">
-              <span>Menara: <b>{snapshot.blueScore.buildCount}</b></span>
-              <span>Eliminasi: <b>{snapshot.blueScore.eliminations}</b></span>
-              <span>Aktif: <b>{snapshot.agents.filter(a => a.side === 'blue' && a.active).length}/5</b></span>
+              <span>Towers: <b>{snapshot.blueScore.buildCount}</b></span>
+              <span>Eliminations: <b>{snapshot.blueScore.eliminations}</b></span>
+              <span>Active: <b>{snapshot.agents.filter(a => a.side === 'blue' && a.active).length}/5</b></span>
             </div>
           </div>
         </div>
@@ -867,8 +862,8 @@ function MatchPage() {
                   </div>
                   <span className="base-badge">
                     {snapshot.stack.knockedDown
-                      ? `⚠️ ROBOH (${snapshot.stack.completed}/5)`
-                      : `🧱 MENARA (${snapshot.stack.completed}/5)`}
+                      ? `⚠️ TOPPLED (${snapshot.stack.completed}/5)`
+                      : `🧱 TOWER (${snapshot.stack.completed}/5)`}
                   </span>
                 </div>
 
@@ -936,17 +931,17 @@ function MatchPage() {
               </>
             ) : (
               <div className="arena-empty">
-                Menghubungkan & Memuat Snapshot Lapangan 5v5...
+                Connecting & Loading 5v5 Arena Snapshot...
               </div>
             )}
           </div>
 
           {snapshot?.phase === "FINISHED" && (
             <div className="match-finish-banner">
-              <h2>Pertandingan Telah Selesai!</h2>
-              <p>Pemenang: <b>TIM {snapshot.winnerSide ? snapshot.winnerSide.toUpperCase() : "SERI"}</b></p>
+              <h2>Match Completed!</h2>
+              <p>Winner: <b>{snapshot.winnerSide ? snapshot.winnerSide.toUpperCase() + ' SQUAD' : 'DRAW'}</b></p>
               <Link className="match-finish-btn" to={`/results/${matchId}`}>
-                Lihat Hasil Lengkap & Hadiah Testnet ➔
+                View Full Results & Testnet Rewards ➔
               </Link>
             </div>
           )}
@@ -954,9 +949,9 @@ function MatchPage() {
 
         <aside className="panel coach">
           <p className="eyebrow">LIVE COACH COMMANDS</p>
-          <h2>Arahan Strategi Instan</h2>
+          <h2>Instant Tactical Directives</h2>
           <p className="muted">
-            Klik tombol arahan cepat untuk menginstruksikan tim Anda secara real-time:
+            Click a quick directive button to guide your squad in real-time:
           </p>
 
           <div className="coach-quick-grid">
@@ -991,16 +986,16 @@ function MatchPage() {
           </div>
 
           <label>
-            Atau Ketik Arahan Kustom:
+            Or Type Custom Tactic:
             <input
               value={coach}
               onChange={(event) => setCoach(event.target.value)}
               placeholder="ATTACK, DEFEND, REBUILD, DISTRACT..."
             />
           </label>
-          <button onClick={send}>Kirim Arahan Tertulis</button>
+          <button onClick={send}>Submit Written Directive</button>
           <p className="muted">
-            Arahan berlaku pada policy boundary berikutnya tanpa mengubah prompt tersimpan.
+            Directives take effect at the next policy boundary without modifying saved prompts.
           </p>
         </aside>
       </div>
@@ -1010,25 +1005,25 @@ function MatchPage() {
 
 function ResultsPage() {
   const { matchId = "unknown" } = useParams();
-  const [status, setStatus] = useState("Memuat hasil");
+  const [status, setStatus] = useState("Loading results");
   const [result, setResult] = useState<MatchResult | null>(null);
   useEffect(() => {
     api
       .getResult(matchId)
       .then((response) => {
         setResult(response.data);
-        setStatus("Hasil terkonfirmasi server");
+        setStatus("Server confirmed result");
       })
       .catch((error) =>
         setStatus(
-          error instanceof Error ? error.message : "Hasil belum tersedia",
+          error instanceof Error ? error.message : "Result not yet available",
         ),
       );
   }, [matchId]);
   return (
     <main className="content narrow">
       <p className="eyebrow">MATCH RESULT · {matchId}</p>
-      <h1>Hasil pertandingan</h1>
+      <h1>Match Results</h1>
       <div className="result-card">
         <img
           className="result-art"
@@ -1040,14 +1035,14 @@ function ResultsPage() {
           {result === null
             ? "Menunggu finalisasi"
             : result.winnerSide === "draw"
-              ? "Pertandingan seri"
-              : `Tim ${result.winnerSide === "red" ? "merah" : "biru"} menang`}
+              ? "Match ended in a draw"
+              : `${result.winnerSide === "red" ? "Red" : "Blue"} Squad Wins`}
         </h2>
         <p>{status}</p>
         {result !== null ? (
           <div className="result-grid">
-            <span><b>MERAH</b> {result.scores.red.buildCount} menara, {result.scores.red.eliminations} eliminasi</span>
-            <span><b>BIRU</b> {result.scores.blue.buildCount} menara, {result.scores.blue.eliminations} eliminasi</span>
+            <span><b>RED</b> {result.scores.red.buildCount} towers, {result.scores.red.eliminations} eliminations</span>
+            <span><b>BLUE</b> {result.scores.blue.buildCount} towers, {result.scores.blue.eliminations} eliminations</span>
             <span><b>REPLAY</b> {result.replayHash.slice(0, 12)}…</span>
             <span><b>RULESET</b> {result.rulesetHash.slice(0, 12)}…</span>
             <span><b>FINAL</b> {result.finalizedAt}</span>
@@ -1055,15 +1050,15 @@ function ResultsPage() {
               <b>MONAD</b>{" "}
               {result.chainTxHash ? (
                 <a href={buildExplorerTxUrl(result.chainTxHash)} target="_blank" rel="noreferrer">
-                  Lihat transaksi ↗
+                  View transaction ↗
                 </a>
-              ) : "Belum tercatat di chain"}
+              ) : "Not yet recorded on chain"}
             </span>
           </div>
         ) : null}
       </div>
       <Link className="button-link" to={`/rewards?matchId=${encodeURIComponent(matchId)}`}>
-        Lihat opsi hadiah testnet ↗
+        View Testnet Reward Options ↗
       </Link>
     </main>
   );
@@ -1082,7 +1077,7 @@ function LeaderboardPage() {
   return (
     <main className="content narrow">
       <p className="eyebrow">LEADERBOARD · SERVER DATA</p>
-      <h1>Papan peringkat</h1>
+      <h1>Arena Leaderboard</h1>
       <img
         className="leaderboard-art"
         src="/art/boai-badges.png"
@@ -1090,7 +1085,7 @@ function LeaderboardPage() {
       />
       <div className="panel table-panel">
         {rows.length === 0 ? (
-          <p className="muted">Belum ada hasil produksi untuk ditampilkan.</p>
+          <p className="muted">No production match results to display yet.</p>
         ) : (
           rows.map((row, index) => (
             <div className="table-row" key={row.teamId}>
@@ -1138,13 +1133,13 @@ function ShopPage() {
   return (
     <main className="content">
       <p className="eyebrow">COSMETICS · NO GAMEPLAY MODIFIER</p>
-      <h1>Toko kosmetik</h1>
+      <h1>Cosmetics Shop</h1>
       <div className="credit-shop-header">
         <div>
-          <small className="eyebrow">DOMPET VIRTUAL</small>
-          <h2>Saldo Anda: 🪙 {credits !== null ? credits.available : '100'} BOAI_CREDIT</h2>
+          <small className="eyebrow">VIRTUAL WALLET</small>
+          <h2>Your Balance: 🪙 {credits !== null ? credits.available : '100'} BOAI_CREDIT</h2>
         </div>
-        <button onClick={claim}>+ Tonton Simulasi Iklan (+25 Kredit)</button>
+        <button onClick={claim}>+ Watch Simulated Ad (+25 Credits)</button>
       </div>
       <div className="shop-grid">
         {SEED.cosmetics.map((item) => (
@@ -1161,8 +1156,7 @@ function ShopPage() {
             <span className="swatch">◆</span>
             <h2>{item.name}</h2>
             <p>
-              {item.category === "skin" ? "Skin agent" : "Efek lempar"} · visual
-              saja
+              {item.category === "skin" ? "Agent skin" : "Throw VFX"} · visual only
             </p>
             <button
               className="secondary"
@@ -1174,10 +1168,10 @@ function ShopPage() {
         ))}
       </div>
       <div className="ad-card">
-        <span>SIMULASI IKLAN</span>
-        <h2>Dukung arena dengan satu klik</h2>
-        <p>Tidak ada advertiser sungguhan atau pembayaran.</p>
-        <button onClick={claim}>Tonton simulasi</button>
+        <span>SIMULATED AD</span>
+        <h2>Support the arena with one click</h2>
+        <p>No real advertisers or monetary payments involved.</p>
+        <button onClick={claim}>Watch simulation</button>
       </div>
       {status && <Notice>{status}</Notice>}
     </main>
@@ -1217,13 +1211,13 @@ function ProfilePage() {
   return (
     <main className="content narrow">
       <p className="eyebrow">PROFILE · SESSION</p>
-      <h1>Profil pemain</h1>
+      <h1>Player Profile</h1>
       <div className="panel profile-card">
         <span className="avatar">{avatarLetter}</span>
         <h2>{usernameDisplay}</h2>
         {profile?.username ? (
           <div className="user-registered-tag">
-            <span className="badge">Akun Terdaftar</span>
+            <span className="badge">Verified Account</span>
             <span className="mono" style={{ fontSize: "0.75rem", color: "var(--parchment-soft)", marginLeft: "8px" }}>
               ID: {profile.userId}
             </span>
@@ -1231,12 +1225,12 @@ function ProfilePage() {
         ) : (
           <div className="user-registered-tag">
             <span className="badge" style={{ borderColor: "var(--line)", color: "var(--parchment-soft)" }}>
-              Sesi Tamu (Guest)
+              Guest Session
             </span>
           </div>
         )}
         <div className="credit-metric-box" style={{ margin: "16px 0", textAlign: "left" }}>
-          <small>SALDO KREDIT BOAI</small>
+          <small>BOAI CREDIT BALANCE</small>
           <div className="metric-val">🪙 {credits?.available ?? 100}</div>
           <span className="metric-unit">BOAI_CREDIT (Virtual)</span>
         </div>
@@ -1250,10 +1244,10 @@ function ProfilePage() {
         )}
         <div className="button-row">
           <Link to="/wallet" style={{ display: "inline-block", padding: "12px 18px", background: "var(--amber)", color: "var(--ink)", fontWeight: 900, textDecoration: "none", borderRadius: "3px" }}>
-            Kelola Dompet & Web3
+            Manage Wallet & Web3
           </Link>
           <button className="secondary" onClick={logout}>
-            Keluar (Logout)
+            Log Out
           </button>
         </div>
       </div>

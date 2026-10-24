@@ -23,7 +23,7 @@ export function RewardsPage() {
   const check = async () => {
     const id = matchId.trim()
     if (id.length === 0) {
-      setFailure({ kind: 'other', message: 'Isi match ID terlebih dahulu.' })
+      setFailure({ kind: 'other', message: 'Please enter a match ID first.' })
       setClaim(null)
       return
     }
@@ -57,11 +57,11 @@ export function RewardsPage() {
 
   return (
     <main className="content narrow">
-      <p className="eyebrow">WEB3 · HADIAH TESTNET</p>
-      <h1>Hadiah demo</h1>
+      <p className="eyebrow">WEB3 · MONAD TESTNET REWARDS</p>
+      <h1>Demo Rewards (Hadiah demo)</h1>
       <p className="lede">
-        Pemenang match yang sudah dicatat bisa menerima satu unit token demo di Monad Testnet. Kontrak menolak klaim
-        kedua untuk match yang sama.
+        Verified match winners can claim one unit of demo reward tokens on Monad Testnet. The smart contract
+        rejects duplicate claims for the same match (menolak klaim kedua).
       </p>
 
       <TestnetBadge detail={NO_VALUE_NOTICE} />
@@ -72,27 +72,27 @@ export function RewardsPage() {
           <input
             value={matchId}
             onChange={event => setMatchId(event.target.value)}
-            placeholder="match-boai-pvp-001"
+            placeholder="e.g. match-123456"
             maxLength={128}
           />
         </label>
         <div className="button-row">
           <button onClick={() => void check()} disabled={busy !== null}>
-            {busy === 'eligibility' ? 'Memeriksa…' : 'Periksa kelayakan'}
+            {busy === 'eligibility' ? 'Checking…' : 'Check Eligibility'}
           </button>
           {canClaim ? (
             <button onClick={() => void doClaim()} disabled={busy !== null}>
-              {busy === 'claim' ? 'Mengirim klaim…' : 'Klaim hadiah demo'}
+              {busy === 'claim' ? 'Submitting claim…' : 'Claim Demo Reward'}
             </button>
           ) : null}
         </div>
 
         {unavailable ? (
           <div className="notice error">
-            <strong>Layanan chain tidak tersedia.</strong>{' '}
+            <strong>Chain service unavailable.</strong>{' '}
             {failure.kind === 'not-configured'
-              ? 'Kontrak testnet belum dikonfigurasi di server. Tidak ada transaksi yang bisa ditampilkan dan tidak ada klaim yang dikirim.'
-              : 'Backend tidak dapat dihubungi. Tidak ada transaksi yang bisa ditampilkan dan tidak ada klaim yang dikirim.'}
+              ? 'Testnet contract is not configured on the server. No transactions can be displayed.'
+              : 'Backend relayer could not be reached. No transactions can be displayed.'}
             <p className="muted">{failure.message}</p>
           </div>
         ) : null}
@@ -109,38 +109,38 @@ export function RewardsPage() {
                 <b>MATCH</b> {claim.matchId}
               </span>
               <span>
-                <b>STATUS</b> {claim.status}
+                <b>STATUS</b> {claim.status.toUpperCase()}
               </span>
               <span>
-                <b>PENERIMA</b>{' '}
+                <b>RECIPIENT</b>{' '}
                 {hasLinkedWallet(claim.recipient) ? (
                   <AddressChip address={claim.recipient} />
                 ) : (
-                  <span className="muted">wallet belum terhubung</span>
+                  <span className="muted">wallet not linked</span>
                 )}
               </span>
               <span>
-                <b>TX</b>{' '}
+                <b>TX HASH</b>{' '}
                 {claim.txHash !== null ? (
                   <a href={buildExplorerTxUrl(claim.txHash)} target="_blank" rel="noreferrer">
-                    Lihat transaksi di explorer ↗
+                    View transaction on explorer ↗
                   </a>
                 ) : (
-                  <span className="muted">belum ada transaksi</span>
+                  <span className="muted">pending transaction</span>
                 )}
               </span>
             </div>
 
             {!hasLinkedWallet(claim.recipient) ? (
               <p className="muted">
-                Hubungkan wallet Monad Testnet di halaman Wallet sebelum klaim. Hadiah hanya bisa dikirim ke wallet
-                yang sudah diverifikasi server.
+                Connect your Monad Testnet wallet on the Wallet page before claiming. Rewards can only be distributed
+                to server-verified wallets.
               </p>
             ) : null}
             {claim.status === 'pending' ? (
               <p className="muted">
-                Transaksi sudah dikirim tetapi blok belum final. Periksa lagi beberapa detik kemudian; klaim ulang tidak
-                akan membuat hadiah kedua.
+                Transaction submitted but block is not yet finalized. Check back in a few seconds; repeat claims will
+                be rejected.
               </p>
             ) : null}
           </div>
@@ -148,17 +148,16 @@ export function RewardsPage() {
       </section>
 
       <section className="panel side-panel">
-        <p className="eyebrow">APA YANG DIBUKTIKAN CATATAN INI</p>
+        <p className="eyebrow">WHAT THIS RECORD PROVES</p>
         <ul>
           <li>{TESTNET_LABEL}</li>
-          <li>Satu match hanya bisa dibayar satu kali oleh kontrak.</li>
-          <li>Hanya pemenang tercatat yang diverifikasi server yang bisa klaim.</li>
-          <li>Kontrak hanya bisa menulis bila pemanggil memegang RECORDER_ROLE.</li>
+          <li>Each match result can only be paid out once by the on-chain contract.</li>
+          <li>Only verified winning accounts with linked wallets can claim.</li>
+          <li>Only the relayer possessing RECORDER_ROLE can record match outcomes.</li>
         </ul>
         <p className="muted">{OPERATOR_ATTESTED_NOTICE}</p>
         <p className="muted">
-          Hash transaksi membuktikan bahwa data tercatat di Monad Testnet. Hash itu tidak membuktikan bahwa simulasi
-          pertandingan berjalan adil, dan tidak memberi nilai uang apa pun.
+          Transaction hashes prove data existence on Monad Testnet without monetary value or off-chain cash-out rights.
         </p>
       </section>
     </main>
