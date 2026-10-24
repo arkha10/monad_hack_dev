@@ -35,9 +35,11 @@
 
 ## Notes
 
-- Branch / commit / PR: agent-a/frontend, Phase 0 bootstrap in progress
+- Branch / commit / PR: main, lead integration commit pending
 - Phase0 locked SHA: 5b0d41be10674acd97e9120588ff04c28ea424d7, merged to origin/main by commit a29d453
-- Chosen package manager, pinned dependencies and build commands: npm 11.19.0, Node 26.7.0, `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`
-- Live frontend / backend URLs: TBD
-- Tests executed and observed outputs: lint, typecheck, and build passed. Shared helper test passed after fixture correction. Forge unavailable on this laptop.
-- Blockers, owner approvals, limitations: Human must review and merge Phase 0 to origin/main. Cloudflare, Supabase, and wallet access remain human setup actions.
+- Frontend work completed in this pass: team.id is read from GET /api/v1/team before practice and queue, missing Supabase configuration now fails honestly, MatchPage consumes MatchSnapshot and opens the frozen WebSocket ticket endpoint, and route ownership is recorded in apps/web/src/router.tsx.
+- Live frontend URL: https://boai-arena-web.pages.dev
+- Backend URL: not deployed. apps/worker/src/index.ts still returns HTTP 501 for B and C routes.
+- Tests executed and observed outputs: npm run lint passed, npm run typecheck passed, npm run build passed, npm test passed with 3 tests, and all 12 browser history routes returned HTTP 200 from the Vite smoke server.
+- Known blockers: Agent B backend branch is not present on origin. Agent C has not supplied a deployed contract or real transaction evidence. Supabase OAuth and guest auth are not configured in the deployed environment. The C-owned Wallet and Rewards route components are not merged into the main router.
+- Handoff: BLOCKED. Owner: Agent B for apps/worker/src/index.ts and authoritative match APIs. Owner: Agent C for deployed Monad contract, secure chain adapter, and Wallet/Rewards route handoff.

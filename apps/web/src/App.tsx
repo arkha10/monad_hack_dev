@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { Team } from "@boai/shared/types";
+import type { MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
 import { parseBehavior } from "@boai/shared/helpers";
 import { SEED } from "@boai/shared/seed";
-import { api } from "./lib/api";
+import { API_BASE_URL, api } from "./lib/api";
 import { getSession, googleLogin, guestLogin, signOut } from "./lib/auth";
 
 const links = [
@@ -290,7 +290,8 @@ function PracticePage() {
   const [status, setStatus] = useState("");
   const start = async () => {
     try {
-      const result = await api.startPractice(difficulty, SEED.demoRedTeam);
+      const team = await api.getTeam();
+      const result = await api.startPractice(difficulty, team.data.id);
       navigate(`/match/${result.data.matchId}`);
     } catch (error) {
       setStatus(
@@ -345,7 +346,8 @@ function QueuePage() {
   const [status, setStatus] = useState("Belum masuk antrean");
   const join = async () => {
     try {
-      const result = await api.joinQueue(SEED.demoRedTeam, 0);
+      const team = await api.getTeam();
+      const result = await api.joinQueue(team.data.id, 0);
       setTicket(result.data.queueTicket);
       setStatus(
         result.data.status === "matched"
@@ -401,22 +403,69 @@ function MatchPage() {
   const { matchId = "unknown" } = useParams();
   const [coach, setCoach] = useState("");
   const [status, setStatus] = useState("Menghubungkan ke MatchDO");
+  const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
   useEffect(() => {
-    api
-      .getMatch(matchId)
-      .then(() => setStatus("Snapshot authoritative diterima"))
-      .catch((error) =>
+    let socket: WebSocket | undefined;
+    let cancelled = false;
+    const connect = async () => {
+      try {
+        const initial = await api.getMatch(matchId);
+        if (cancelled) return;
+        setSnapshot(initial.data);
+        const ticket = await api.createMatchSocketTicket(matchId);
+        const apiUrl = new URL(API_BASE_URL);
+        const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+        socket = new WebSocket(
+          `${protocol}//${apiUrl.host}/ws/v1/matches/${matchId}?ticket=${encodeURIComponent(ticket.data.ticket)}`,
+        );
+        socket.onopen = () => {
+          setStatus("WebSocket authoritative tersambung");
+          socket?.send(JSON.stringify({ type: "CLIENT_READY", matchId }));
+        };
+        socket.onmessage = (event) => {
+          const message = JSON.parse(event.data) as ServerWsMessage;
+          if (message.type === "MATCH_SNAPSHOT") setSnapshot(message.snapshot);
+          if (message.type === "MATCH_COMPLETE")
+            setStatus("Pertandingan selesai");
+          if (message.type === "COACH_ACK")
+            setStatus(
+              message.accepted
+                ? "Arahan coach diterima"
+                : `Arahan ditolak: ${message.reason ?? "aturan match"}`,
+            );
+          if (message.type === "ERROR") setStatus(message.message);
+        };
+        socket.onerror = () =>
+          setStatus("WebSocket tidak tersedia. Menunggu server authoritative.");
+        socket.onclose = () => {
+          if (!cancelled) setStatus("Koneksi match terputus");
+        };
+      } catch (error) {
         setStatus(
           error instanceof Error ? error.message : "Match belum tersedia",
-        ),
-      );
+        );
+      }
+    };
+    connect();
+    return () => {
+      cancelled = true;
+      socket?.close();
+    };
   }, [matchId]);
   const send = async () => {
     const command = coach.trim().toUpperCase() as
       "ATTACK" | "DEFEND" | "REBUILD" | "DISTRACT";
+    if (!["ATTACK", "DEFEND", "REBUILD", "DISTRACT"].includes(command)) {
+      setStatus("Gunakan ATTACK, DEFEND, REBUILD, atau DISTRACT");
+      return;
+    }
     try {
-      await api.sendCoach(matchId, command);
-      setStatus(`Coach ${command} diterima`);
+      const result = await api.sendCoach(matchId, command);
+      setStatus(
+        result.data.accepted
+          ? `Coach ${command} diterima`
+          : `Coach ${command} ditolak`,
+      );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Coach gagal");
     }
@@ -445,23 +494,61 @@ function MatchPage() {
                 src="/art/boai-vfx.png"
                 alt="Efek lintasan lempar bola dan benturan"
               />
-              <div className="stack big">
-                ◆<br />◆<br />◆<br />◆
-              </div>
-              {["R1", "R2", "R3", "R4", "R5", "B1", "B2", "B3", "B4", "B5"].map(
-                (label, index) => (
-                  <span key={label} className={`player player-${index + 1}`}>
-                    {label}
+              {snapshot ? (
+                <>
+                  <div
+                    className="stack big"
+                    style={{
+                      left: `${snapshot.stack.position.x * 100}%`,
+                      top: `${snapshot.stack.position.y * 100}%`,
+                    }}
+                  >
+                    {Array.from({ length: snapshot.stack.completed }).map(
+                      (_, index) => (
+                        <Fragment key={index}>
+                          ◆<br />
+                        </Fragment>
+                      ),
+                    )}
+                  </div>
+                  {snapshot.agents.map((agent) => (
+                    <span
+                      key={`${agent.side}-${agent.slot}`}
+                      className="player"
+                      style={{
+                        left: `${agent.position.x * 100}%`,
+                        top: `${agent.position.y * 100}%`,
+                        borderColor:
+                          agent.side === "red" ? "#ef916f" : "#b3f77f",
+                        color: agent.side === "red" ? "#ef916f" : "#b3f77f",
+                      }}
+                    >
+                      {agent.slot}
+                    </span>
+                  ))}
+                  <span
+                    className="ball big-ball"
+                    style={{
+                      left: `${snapshot.ball.position.x * 100}%`,
+                      top: `${snapshot.ball.position.y * 100}%`,
+                    }}
+                  >
+                    ●
                   </span>
-                ),
+                </>
+              ) : (
+                <div className="arena-empty">
+                  Menunggu snapshot authoritative...
+                </div>
               )}
-              <span className="ball big-ball">●</span>
             </div>
           </div>
           <div className="scoreline">
-            <span>RED 00</span>
-            <span>05:00</span>
-            <span>BLUE 00</span>
+            <span>RED {snapshot?.redScore.buildCount ?? 0}</span>
+            <span>
+              {snapshot ? `${Math.ceil(snapshot.remainingMs / 1000)}s` : "--"}
+            </span>
+            <span>BLUE {snapshot?.blueScore.buildCount ?? 0}</span>
           </div>
         </section>
         <aside className="panel coach">

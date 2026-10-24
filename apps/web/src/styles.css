@@ -501,6 +501,16 @@ textarea:focus {
 .arena-grid-overlay {
   background: rgba(8, 20, 13, 0.28);
 }
+.arena-empty {
+  display: grid;
+  position: absolute;
+  inset: 0;
+  place-items: center;
+  color: #d8eadc;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  background: rgba(8, 20, 13, 0.42);
+}
 .vfx-art {
   position: absolute;
   inset: 8% 10% auto auto;
@@ -513,8 +523,15 @@ textarea:focus {
   animation: vfxPulse 2.4s ease-in-out infinite;
 }
 @keyframes vfxPulse {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(0.98); opacity: 0.48; }
-  50% { transform: translate3d(-6px, 4px, 0) scale(1.04); opacity: 0.82; }
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.98);
+    opacity: 0.48;
+  }
+  50% {
+    transform: translate3d(-6px, 4px, 0) scale(1.04);
+    opacity: 0.82;
+  }
 }
 .player-1 {
   left: 18%;
