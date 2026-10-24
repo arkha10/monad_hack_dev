@@ -179,3 +179,325 @@ textarea { min-height: 82px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+
+/* ==========================================================================
+   LIVE ARENA 2D VISUALIZATION & 10 AI AGENTS (MATCH HUD & ENTITIES)
+   ========================================================================== */
+.arena-hud {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  background: rgba(8, 13, 29, 0.95);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 12px 18px;
+  margin-bottom: 12px;
+}
+.hud-team { display: flex; flex-direction: column; gap: 4px; }
+.hud-team.red { text-align: left; }
+.hud-team.blue { text-align: right; }
+.hud-team-name { font-weight: 900; font-size: 1.15rem; letter-spacing: 0.05em; }
+.hud-team.red .hud-team-name { color: #f87171; }
+.hud-team.blue .hud-team-name { color: #38bdf8; }
+.hud-team-role { font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 3px; display: inline-block; }
+.hud-team.red .hud-team-role { background: rgba(220, 38, 38, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+.hud-team.blue .hud-team-role { background: rgba(2, 132, 199, 0.25); color: #bae6fd; border: 1px solid rgba(56, 189, 248, 0.4); }
+.hud-stats { display: flex; gap: 14px; font-size: 0.8rem; color: var(--parchment-soft); }
+.hud-team.blue .hud-stats { justify-content: flex-end; }
+.hud-stats b { color: var(--amber); }
+
+.hud-center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.hud-timer {
+  font-family: monospace;
+  font-size: 2.3rem;
+  font-weight: 900;
+  color: var(--amber);
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+.hud-half { font-size: 0.72rem; font-weight: 800; color: var(--parchment-soft); letter-spacing: 0.1em; }
+.hud-phase-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--amber);
+  border: 1px solid var(--amber);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Arena Pitch & Field */
+.arena-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1000 / 600;
+  min-height: 380px;
+  border: 2px solid var(--amber);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #090e21;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.85);
+}
+.arena-bg-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  filter: saturate(0.85) brightness(0.48);
+}
+.arena-markings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.arena-center-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateX(-50%);
+}
+.arena-center-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150px;
+  height: 150px;
+  border: 2px dashed rgba(245, 158, 11, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Base & Stack (Tumpukan Genteng) */
+.base-zone {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 5;
+}
+.base-circle-ring {
+  width: 90px;
+  height: 90px;
+  border: 2px dashed #f59e0b;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.02) 70%, transparent 100%);
+  animation: pulse-ring 2.2s infinite ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tile-stack-tower {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 2px;
+}
+.tile-brick {
+  width: 34px;
+  height: 9px;
+  background: linear-gradient(180deg, #ea580c, #9a3412);
+  border: 1px solid #fed7aa;
+  border-radius: 2px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+.scattered-tiles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  width: 60px;
+  justify-content: center;
+}
+.scattered-tile {
+  width: 13px;
+  height: 7px;
+  background: #ea580c;
+  border: 1px solid #fed7aa;
+  border-radius: 1px;
+  transform: rotate(var(--rot, 15deg));
+  opacity: 0.85;
+}
+.base-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  white-space: nowrap;
+  margin-top: 4px;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* 10 AI Agents */
+.arena-agent {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  transition: left 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 10;
+}
+.agent-stamina-bar {
+  width: 42px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+.agent-stamina-fill {
+  height: 100%;
+  transition: width 0.15s linear, background-color 0.2s ease;
+}
+.agent-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  position: relative;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7);
+}
+.agent-circle.red {
+  background: radial-gradient(circle at 35% 35%, #ef4444, #991b1b);
+  border: 2px solid #fca5a5;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.7);
+}
+.agent-circle.blue {
+  background: radial-gradient(circle at 35% 35%, #0284c7, #075985);
+  border: 2px solid #7dd3fc;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+}
+.agent-circle.eliminated {
+  opacity: 0.35;
+  filter: grayscale(1);
+  box-shadow: none;
+}
+.agent-circle.has-ball {
+  border-color: #facc15 !important;
+  box-shadow: 0 0 18px #facc15, 0 0 8px #f59e0b !important;
+  animation: pulse-ball-holder 1s infinite alternate;
+}
+.agent-action-pill {
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(8, 13, 29, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #f1f5f9;
+  white-space: nowrap;
+  margin-top: 2px;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* Ball */
+.arena-ball {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: left 0.12s linear, top 0.12s linear;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ball-orb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fef08a, #f97316 60%, #9a3412);
+  border: 1px solid #fff;
+  box-shadow: 0 0 14px #ea580c, 0 0 6px #fed7aa;
+}
+.ball-moving {
+  animation: spin-ball 0.5s linear infinite;
+}
+.ball-badge {
+  font-size: 0.55rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(234, 88, 12, 0.95);
+  color: #fff;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* Quick Coach Buttons */
+.coach-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.coach-quick-btn {
+  padding: 10px 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--amber);
+  background: var(--indigo-700);
+  color: var(--parchment);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.coach-quick-btn:hover {
+  background: var(--orange-deep);
+  border-color: #fff;
+}
+.match-finish-banner {
+  margin-top: 16px;
+  padding: 16px;
+  background: linear-gradient(90deg, #1e1b4b, #312e81);
+  border: 2px solid var(--amber);
+  border-radius: 4px;
+  text-align: center;
+}
+.match-finish-btn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: var(--orange);
+  color: #fff;
+  font-weight: 900;
+  text-decoration: none;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 15px rgba(234, 88, 12, 0.5);
+}
+
+@keyframes pulse-ring {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+@keyframes pulse-ball-holder {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.1); }
+}
+@keyframes spin-ball {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

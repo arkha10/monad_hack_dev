@@ -443,17 +443,36 @@ function QueuePage() {
 function MatchPage() {
   const { matchId = "unknown" } = useParams();
   const [coach, setCoach] = useState("");
-  const [status, setStatus] = useState("Menghubungkan ke MatchDO");
+  const [status, setStatus] = useState("Menghubungkan ke server match...");
   const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
+
   useEffect(() => {
     let socket: WebSocket | undefined;
     let cancelled = false;
+
+    // Initial fetch
+    api.getMatch(matchId).then((res) => {
+      if (!cancelled && res.data) setSnapshot(res.data);
+    }).catch(() => {});
+
+    // Polling fallback every 800ms to guarantee continuous live updates
+    const pollInterval = setInterval(async () => {
+      if (cancelled) return;
+      try {
+        const res = await api.getMatch(matchId);
+        if (!cancelled && res.data) {
+          setSnapshot(res.data);
+          if (res.data.phase === "FINISHED") {
+            setStatus("Pertandingan selesai! Siap melihat hasil.");
+          }
+        }
+      } catch {}
+    }, 800);
+
     const connect = async () => {
       try {
-        const initial = await api.getMatch(matchId);
-        if (cancelled) return;
-        setSnapshot(initial.data);
         const ticket = await api.createMatchSocketTicket(matchId);
+        if (cancelled) return;
         const apiUrl = new URL(API_BASE_URL || window.location.origin);
         const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
         socket = new WebSocket(
@@ -466,33 +485,50 @@ function MatchPage() {
         socket.onmessage = (event) => {
           const message = JSON.parse(event.data) as ServerWsMessage;
           if (message.type === "MATCH_SNAPSHOT") setSnapshot(message.snapshot);
-          if (message.type === "MATCH_COMPLETE")
+          if (message.type === "MATCH_COMPLETE") {
             setStatus("Pertandingan selesai");
-          if (message.type === "COACH_ACK")
+          }
+          if (message.type === "COACH_ACK") {
             setStatus(
               message.accepted
                 ? "Arahan coach diterima"
                 : `Arahan ditolak: ${message.reason ?? "aturan match"}`,
             );
+          }
           if (message.type === "ERROR") setStatus(message.message);
         };
-        socket.onerror = () =>
-          setStatus("WebSocket tidak tersedia. Menunggu server authoritative.");
-        socket.onclose = () => {
-          if (!cancelled) setStatus("Koneksi match terputus");
+        socket.onerror = () => {
+          setStatus("Sinkronisasi live via server aktif.");
         };
-      } catch (error) {
-        setStatus(
-          error instanceof Error ? error.message : "Match belum tersedia",
-        );
+        socket.onclose = () => {
+          if (!cancelled) setStatus("Sinkronisasi live via server aktif.");
+        };
+      } catch {
+        setStatus("Sinkronisasi live via server aktif.");
       }
     };
     connect();
+
     return () => {
       cancelled = true;
+      clearInterval(pollInterval);
       socket?.close();
     };
   }, [matchId]);
+
+  const sendCommand = async (cmd: "ATTACK" | "DEFEND" | "REBUILD" | "DISTRACT") => {
+    try {
+      const result = await api.sendCoach(matchId, cmd);
+      setStatus(
+        result.data.accepted
+          ? `Coach ${cmd} diterima server`
+          : `Coach ${cmd} ditolak`,
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Coach gagal dikirim");
+    }
+  };
+
   const send = async () => {
     const command = coach.trim().toUpperCase() as
       "ATTACK" | "DEFEND" | "REBUILD" | "DISTRACT";
@@ -500,110 +536,249 @@ function MatchPage() {
       setStatus("Gunakan ATTACK, DEFEND, REBUILD, atau DISTRACT");
       return;
     }
-    try {
-      const result = await api.sendCoach(matchId, command);
-      setStatus(
-        result.data.accepted
-          ? `Coach ${command} diterima`
-          : `Coach ${command} ditolak`,
-      );
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Coach gagal");
+    await sendCommand(command);
+  };
+
+  const actionLabel = (act: string) => {
+    switch (act) {
+      case "BUILD": return "🧱 BUILD";
+      case "SPRINT": return "⚡ SPRINT";
+      case "THROW": return "🎯 THROW";
+      case "PASS_BALL": return "↗ PASS";
+      case "DODGE": return "💨 DODGE";
+      case "PICKUP_BALL": return "✋ PICKUP";
+      case "GUARD_STACK": return "🛡 GUARD";
+      case "DISTRACT": return "👀 DECOY";
+      case "MOVE_TO": return "➔ MOVE";
+      default: return "⏳ WAIT";
     }
   };
+
   return (
     <main className="content">
       <div className="page-head">
         <div>
           <p className="eyebrow">MATCH {matchId}</p>
-          <h1>Arena sedang berjalan</h1>
+          <h1>Arena Boi-boian 5v5 Live</h1>
           <p>{status}</p>
         </div>
-        <span className="badge">LIVE · 2 HALVES</span>
+        <span className="badge">LIVE · 2 HALVES · DETERMINISTIC</span>
       </div>
+
+      {snapshot && (
+        <div className="arena-hud">
+          <div className="hud-team red">
+            <span className="hud-team-name">TIM MERAH</span>
+            <span className="hud-team-role">
+              {snapshot.redRole === "REBUILDERS" ? "🧱 REBUILDER (Menyusun)" : "🎯 HUNTER (Melempar Bola)"}
+            </span>
+            <div className="hud-stats">
+              <span>Menara: <b>{snapshot.redScore.buildCount}</b></span>
+              <span>Eliminasi: <b>{snapshot.redScore.eliminations}</b></span>
+              <span>Aktif: <b>{snapshot.agents.filter(a => a.side === 'red' && a.active).length}/5</b></span>
+            </div>
+          </div>
+
+          <div className="hud-center">
+            <span className="hud-half">BABAK {snapshot.half} / 2</span>
+            <div className="hud-timer">
+              {Math.floor(snapshot.remainingMs / 60000)}:{String(Math.floor((snapshot.remainingMs % 60000) / 1000)).padStart(2, "0")}
+            </div>
+            <span className="hud-phase-badge">{snapshot.phase}</span>
+          </div>
+
+          <div className="hud-team blue">
+            <span className="hud-team-name">TIM BIRU</span>
+            <span className="hud-team-role">
+              {snapshot.blueRole === "REBUILDERS" ? "🧱 REBUILDER (Menyusun)" : "🎯 HUNTER (Melempar Bola)"}
+            </span>
+            <div className="hud-stats">
+              <span>Menara: <b>{snapshot.blueScore.buildCount}</b></span>
+              <span>Eliminasi: <b>{snapshot.blueScore.eliminations}</b></span>
+              <span>Aktif: <b>{snapshot.agents.filter(a => a.side === 'blue' && a.active).length}/5</b></span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="match-layout">
         <section className="arena">
-          <div className="arena-grid">
+          <div className="arena-stage">
             <img
-              className="match-art"
+              className="arena-bg-img"
               src="/art/boai-hero-arena.png"
               alt="Ilustrasi lapangan Boi-boian"
             />
-            <div className="arena-grid-overlay">
-              <img
-                className="vfx-art"
-                src="/art/boai-vfx.png"
-                alt="Efek lintasan lempar bola dan benturan"
-              />
-              {snapshot ? (
-                <>
-                  <div
-                    className="stack big"
-                    style={{
-                      left: `${snapshot.stack.position.x * 100}%`,
-                      top: `${snapshot.stack.position.y * 100}%`,
-                    }}
-                  >
-                    {Array.from({ length: snapshot.stack.completed }).map(
-                      (_, index) => (
-                        <Fragment key={index}>
-                          ◆<br />
-                        </Fragment>
-                      ),
+            <div className="arena-markings">
+              <div className="arena-center-line" />
+              <div className="arena-center-circle" />
+            </div>
+
+            {snapshot ? (
+              <>
+                {/* Tumpukan Genteng (Base Stack) */}
+                <div
+                  className="base-zone"
+                  style={{
+                    left: `${Math.max(5, Math.min(95, (snapshot.stack.position.x / 1000) * 100))}%`,
+                    top: `${Math.max(5, Math.min(95, (snapshot.stack.position.y / 600) * 100))}%`,
+                  }}
+                >
+                  <div className="base-circle-ring">
+                    {snapshot.stack.knockedDown ? (
+                      <div className="scattered-tiles">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="scattered-tile"
+                            style={{ ['--rot' as any]: `${(i * 35) - 45}deg` }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="tile-stack-tower">
+                        {Array.from({ length: snapshot.stack.completed }).map((_, i) => (
+                          <div key={i} className="tile-brick" />
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {snapshot.agents.map((agent) => (
-                    <span
-                      key={`${agent.side}-${agent.slot}`}
-                      className="player"
-                      style={{
-                        left: `${agent.position.x * 100}%`,
-                        top: `${agent.position.y * 100}%`,
-                        borderColor:
-                          agent.side === "red" ? "#d86122" : "#e9b94e",
-                        color: agent.side === "red" ? "#d86122" : "#e9b94e",
-                      }}
-                    >
-                      {agent.slot}
-                    </span>
-                  ))}
-                  <span
-                    className="ball big-ball"
-                    style={{
-                      left: `${snapshot.ball.position.x * 100}%`,
-                      top: `${snapshot.ball.position.y * 100}%`,
-                    }}
-                  >
-                    ●
+                  <span className="base-badge">
+                    {snapshot.stack.knockedDown
+                      ? `⚠️ ROBOH (${snapshot.stack.completed}/5)`
+                      : `🧱 MENARA (${snapshot.stack.completed}/5)`}
                   </span>
-                </>
-              ) : (
-                <div className="arena-empty">
-                  Menunggu snapshot authoritative...
                 </div>
-              )}
+
+                {/* 10 AI Agents */}
+                {snapshot.agents.map((agent) => {
+                  const xPct = Math.max(3, Math.min(97, (agent.position.x / 1000) * 100));
+                  const yPct = Math.max(4, Math.min(96, (agent.position.y / 600) * 100));
+                  const isBallHolder = snapshot.ball.holder === `${agent.side}:${agent.slot}`;
+                  const staminaColor =
+                    agent.stamina > 50 ? "#22c55e" : agent.stamina > 20 ? "#eab308" : "#ef4444";
+
+                  return (
+                    <div
+                      key={`${agent.side}-${agent.slot}`}
+                      className="arena-agent"
+                      style={{ left: `${xPct}%`, top: `${yPct}%` }}
+                    >
+                      {/* Stamina / Energy Bar */}
+                      <div className="agent-stamina-bar">
+                        <div
+                          className="agent-stamina-fill"
+                          style={{
+                            width: `${Math.max(0, Math.min(100, agent.stamina))}%`,
+                            backgroundColor: staminaColor,
+                          }}
+                        />
+                      </div>
+
+                      {/* Agent Avatar */}
+                      <div
+                        className={`agent-circle ${agent.side} ${!agent.active ? "eliminated" : ""} ${
+                          isBallHolder ? "has-ball" : ""
+                        }`}
+                      >
+                        {agent.active ? agent.slot.toUpperCase() : "✕"}
+                      </div>
+
+                      {/* Action Pill Badge */}
+                      <span className="agent-action-pill">
+                        {agent.active ? actionLabel(agent.currentAction) : "OUT"}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Bola Boi-boian */}
+                <div
+                  className="arena-ball"
+                  style={{
+                    left: `${Math.max(3, Math.min(97, (snapshot.ball.position.x / 1000) * 100))}%`,
+                    top: `${Math.max(3, Math.min(97, (snapshot.ball.position.y / 600) * 100))}%`,
+                  }}
+                >
+                  <div
+                    className={`ball-orb ${
+                      Math.hypot(snapshot.ball.velocity.x, snapshot.ball.velocity.y) > 0 ? "ball-moving" : ""
+                    }`}
+                  />
+                  {snapshot.ball.holder && (
+                    <span className="ball-badge">
+                      ✋ ${snapshot.ball.holder.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="arena-empty">
+                Menghubungkan & Memuat Snapshot Lapangan 5v5...
+              </div>
+            )}
+          </div>
+
+          {snapshot?.phase === "FINISHED" && (
+            <div className="match-finish-banner">
+              <h2>Pertandingan Telah Selesai!</h2>
+              <p>Pemenang: <b>TIM {snapshot.winnerSide ? snapshot.winnerSide.toUpperCase() : "SERI"}</b></p>
+              <Link className="match-finish-btn" to={`/results/${matchId}`}>
+                Lihat Hasil Lengkap & Hadiah Testnet ➔
+              </Link>
             </div>
-          </div>
-          <div className="scoreline">
-            <span>RED {snapshot?.redScore.buildCount ?? 0}</span>
-            <span>
-              {snapshot ? `${Math.ceil(snapshot.remainingMs / 1000)}s` : "--"}
-            </span>
-            <span>BLUE {snapshot?.blueScore.buildCount ?? 0}</span>
-          </div>
+          )}
         </section>
+
         <aside className="panel coach">
-          <p className="eyebrow">LIVE COACH</p>
-          <h2>Ubah pendekatan tim</h2>
-          <input
-            value={coach}
-            onChange={(event) => setCoach(event.target.value)}
-            placeholder="ATTACK, DEFEND, REBUILD..."
-          />
-          <button onClick={send}>Kirim arahan</button>
+          <p className="eyebrow">LIVE COACH COMMANDS</p>
+          <h2>Arahan Strategi Instan</h2>
           <p className="muted">
-            Arahan berlaku pada policy boundary berikutnya dan tidak mengubah
-            prompt tersimpan.
+            Klik tombol arahan cepat untuk menginstruksikan tim Anda secara real-time:
+          </p>
+
+          <div className="coach-quick-grid">
+            <button
+              type="button"
+              className="coach-quick-btn"
+              onClick={() => sendCommand("REBUILD")}
+            >
+              🧱 REBUILD
+            </button>
+            <button
+              type="button"
+              className="coach-quick-btn"
+              onClick={() => sendCommand("ATTACK")}
+            >
+              🎯 ATTACK
+            </button>
+            <button
+              type="button"
+              className="coach-quick-btn"
+              onClick={() => sendCommand("DEFEND")}
+            >
+              🛡 DEFEND
+            </button>
+            <button
+              type="button"
+              className="coach-quick-btn"
+              onClick={() => sendCommand("DISTRACT")}
+            >
+              💨 DISTRACT
+            </button>
+          </div>
+
+          <label>
+            Atau Ketik Arahan Kustom:
+            <input
+              value={coach}
+              onChange={(event) => setCoach(event.target.value)}
+              placeholder="ATTACK, DEFEND, REBUILD, DISTRACT..."
+            />
+          </label>
+          <button onClick={send}>Kirim Arahan Tertulis</button>
+          <p className="muted">
+            Arahan berlaku pada policy boundary berikutnya tanpa mengubah prompt tersimpan.
           </p>
         </aside>
       </div>
