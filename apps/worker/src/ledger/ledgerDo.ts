@@ -5,7 +5,7 @@ import type {
   LedgerTeamRequest,
 } from '../routes/doProtocol'
 import type { Env } from '../routes/env'
-import type { SqlStore } from '../storage/sql'
+import { durableObjectSql } from '../storage/sql'
 import { LedgerService, asAddress, asHash, isClaimStatus } from './ledgerService'
 
 type Body = Record<string, unknown>
@@ -75,7 +75,7 @@ export class LedgerDurableObject {
 
   private ledger(): LedgerService {
     if (!this.service) {
-      this.service = new LedgerService(this.state.storage.sql as unknown as SqlStore, Date.now)
+      this.service = new LedgerService(durableObjectSql(this.state), Date.now)
     }
     return this.service
   }

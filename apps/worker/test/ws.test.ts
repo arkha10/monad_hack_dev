@@ -215,7 +215,12 @@ describe('MatchSession fan-out', () => {
 })
 
 interface FakeDoState {
-  storage: { sql: MemorySqlStore; setAlarm: () => Promise<void>; getAlarm: () => Promise<null> }
+  storage: {
+    sql: { exec: (query: string, ...bindings: unknown[]) => unknown }
+    transactionSync: (closure: () => unknown) => unknown
+    setAlarm: () => Promise<void>
+    getAlarm: () => Promise<null>
+  }
   acceptWebSocket: (ws: WebSocket) => void
   accepted: WebSocket[]
 }
@@ -224,7 +229,12 @@ function fakeDoState(store: MemorySqlStore): FakeDoState {
   const accepted: WebSocket[] = []
   return {
     accepted,
-    storage: { sql: store, setAlarm: async () => {}, getAlarm: async () => null },
+    storage: {
+      sql: { exec: (query: string, ...bindings: unknown[]) => store.exec(query, ...(bindings as never[])) },
+      transactionSync: (closure: () => unknown) => store.transaction(closure),
+      setAlarm: async () => {},
+      getAlarm: async () => null,
+    },
     acceptWebSocket: (ws: WebSocket) => {
       accepted.push(ws)
     },

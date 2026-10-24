@@ -2,7 +2,7 @@ import type { CoachCommand, MatchEvent, MatchSnapshot } from '@boai/shared/types
 import type { Env } from '../routes/env'
 import { HttpError } from '../routes/http'
 import type { CoachRequest, MatchInitRequest } from '../routes/doProtocol'
-import type { SqlStore } from '../storage/sql'
+import { durableObjectSql } from '../storage/sql'
 import { MATCH } from '../game/ruleset'
 import { MatchService } from './matchService'
 import { MatchSession } from './matchSocket'
@@ -42,7 +42,7 @@ export class MatchDurableObject {
 
   private service(): MatchService {
     if (!this.matchService) {
-      this.matchService = new MatchService(this.state.storage.sql as unknown as SqlStore, () => Date.now())
+      this.matchService = new MatchService(durableObjectSql(this.state), () => Date.now())
     }
     return this.matchService
   }

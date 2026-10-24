@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { LedgerDurableObject } from '../src/ledger/ledgerDo'
 import { LedgerService } from '../src/ledger/ledgerService'
 import type { Env } from '../src/routes/env'
-import type { SqlStore } from '../src/storage/sql'
+import type { SqlValue } from '../src/storage/sql'
 import { MemorySqlStore } from '../src/testing/memorySql'
 
 const USER = '00000000-0000-4000-8000-000000000101'
@@ -23,7 +23,14 @@ function sync(userId: string) {
 }
 
 function callDo(path: string, body: unknown): Promise<Response> {
-  const state = { storage: { sql: sql as unknown as SqlStore } } as unknown as DurableObjectState
+  const state = {
+    storage: {
+      sql: {
+        exec: (query: string, ...bindings: SqlValue[]) => sql.exec(query, ...bindings),
+      },
+      transactionSync: (closure: () => unknown) => sql.transaction(closure),
+    },
+  } as unknown as DurableObjectState
   const durableObject = new LedgerDurableObject(state, {} as Env)
   return durableObject.fetch(
     new Request(`https://ledger.internal${path}`, { method: 'POST', body: JSON.stringify(body) }),
