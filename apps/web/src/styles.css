@@ -510,6 +510,11 @@ textarea:focus {
   object-position: top left;
   mix-blend-mode: screen;
   pointer-events: none;
+  animation: vfxPulse 2.4s ease-in-out infinite;
+}
+@keyframes vfxPulse {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.98); opacity: 0.48; }
+  50% { transform: translate3d(-6px, 4px, 0) scale(1.04); opacity: 0.82; }
 }
 .player-1 {
   left: 18%;
