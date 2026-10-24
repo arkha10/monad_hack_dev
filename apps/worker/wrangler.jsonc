@@ -39,8 +39,8 @@
   "vars": {
     "WEB_ORIGIN": "https://boai-api.arkha10-boai.workers.dev",
     "BOAI_ENV": "production",
-    "MONAD_RPC_URL": "https://testnet-rpc.monad.xyz",
+    "MONAD_RPC_URL": "https://rpc-testnet.monadinfra.com",
     "MONAD_CHAIN_ID": "10143",
-    "BOAI_CONTRACT_ADDRESS": "0x5cA83f6072ABFF68fcaA84264830224B57EA12B1"
+    "BOAI_CONTRACT_ADDRESS": "0x5af642ed0427567b0dfd5ecd9474f174dbda8420"
   }
 }

@@ -1,5 +1,13 @@
 # BOAI — Boi-boian Online Agentic Arena
 
+> **Monad Blitz Jogja 2026 — Verified Live Deployment**
+>
+> - **Live Web App:** https://boai-api.arkha10-boai.workers.dev/
+> - **Deployed Contract (Monad Testnet - Chain 10143):** [`0x5af642ed0427567b0dfd5ecd9474f174dbda8420`](https://testnet.monadscan.com/address/0x5af642ed0427567b0dfd5ecd9474f174dbda8420)
+> - **Deployment Tx:** [`0x02f129d432461960335ad56e80dba8bcc759cd48efe8849e480c28f532826d4e`](https://testnet.monadscan.com/tx/0x02f129d432461960335ad56e80dba8bcc759cd48efe8849e480c28f532826d4e)
+> - **Live Match Record Tx:** [`0x0489e4e846696d1ceec9b8c913a65d43a037a80a876b9964e1a861714a441af8`](https://testnet.monadscan.com/tx/0x0489e4e846696d1ceec9b8c913a65d43a037a80a876b9964e1a861714a441af8)
+> - **Live Demo Reward Tx:** [`0x08adc1aeca5d7fbf9c70636480b9182186d20748cbf494402221af44f5118847`](https://testnet.monadscan.com/tx/0x08adc1aeca5d7fbf9c70636480b9182186d20748cbf494402221af44f5118847)
+
 Phase 0 scaffold is ready on branch `agent-a/frontend`. It includes the React and Vite web shell, Cloudflare Worker Durable Object bindings, frozen shared TypeScript contracts, deterministic helper tests, route placeholders for all twelve routes, and a Foundry contract skeleton.
 
 The current app is a scaffold. Backend gameplay, real authentication, WebSocket matchmaking, wallet integration, and testnet deployment are not yet claimed as working. `BOAI_CREDIT` is virtual and nonredeemable. Any testnet reward must be labeled `TESTNET · TANPA NILAI UANG`.

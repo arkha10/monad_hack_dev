@@ -15,7 +15,7 @@ Checked against `https://docs.monad.xyz/developer-essentials/testnet` on 2026-10
 | Field | Value |
 | --- | --- |
 | Chain ID | `10143` |
-| RPC URL | `https://testnet-rpc.monad.xyz` |
+| RPC URL | `https://rpc-testnet.monadinfra.com` |
 | Block explorer | `https://testnet.monadscan.com` |
 | Faucet | `https://faucet.monad.xyz` |
 | Native currency | `MON` |
@@ -33,9 +33,10 @@ reset do not exist on the current chain.
 | Amount per reward | `1e18` (one whole demo unit) |
 | Contract | `contracts/src/BOAIArena.sol` |
 | Mint authority | `RECORDER_ROLE` only |
-| Deployed Address | `0x5cA83f6072ABFF68fcaA84264830224B57EA12B1` |
-| Recorder Address | `0x97971c36721cE32d53745457Fea44b42d397b54D` |
-| Explorer URL | https://testnet.monadscan.com/address/0x5cA83f6072ABFF68fcaA84264830224B57EA12B1 |
+| Deployed Address | `0x5af642ed0427567b0dfd5ecd9474f174dbda8420` |
+| Recorder Address | `0x0F459882C3ffF5707e6360AA2BDBc826CA468646` |
+| Deployment Tx | `0x02f129d432461960335ad56e80dba8bcc759cd48efe8849e480c28f532826d4e` |
+| Explorer URL | https://testnet.monadscan.com/address/0x5af642ed0427567b0dfd5ecd9474f174dbda8420 |
 
 ## Non-goals
 

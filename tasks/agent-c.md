@@ -27,16 +27,16 @@
 ## Phase 2 — real deployment + evidence
 
 - [x] [US-14] Obtain explicit human approval for deployment wallet; obtain testnet faucet funding without purchasing anything; never expose seed or private key.
-  - Human approved deployment with deployer wallet `0x97971c36721cE32d53745457Fea44b42d397b54D` funded via Monad faucet.
+  - Human approved deployment with deployer wallet `0x0F459882C3ffF5707e6360AA2BDBc826CA468646` funded via Monad faucet.
 - [x] [US-14] Deploy contracts **during hackathon**, verify source where explorer allows, record deployed address, tx hash and exact explorer links.
   - Deployed `BOAIArena.sol` to Monad Testnet (Chain ID 10143).
-  - Deployed Contract Address: `0x5cA83f6072ABFF68fcaA84264830224B57EA12B1`
-  - Recorder Address: `0x97971c36721cE32d53745457Fea44b42d397b54D`
-  - Explorer Link: https://testnet.monadscan.com/address/0x5cA83f6072ABFF68fcaA84264830224B57EA12B1
+  - Deployed Contract Address: `0x5af642ed0427567b0dfd5ecd9474f174dbda8420`
+  - Recorder Address: `0x0F459882C3ffF5707e6360AA2BDBc826CA468646`
+  - Explorer Link: https://testnet.monadscan.com/address/0x5af642ed0427567b0dfd5ecd9474f174dbda8420
 - [ ] [US-11,US-17] End-to-end guest/player match → stored result → connect wallet → claim testnet reward once → replay claim fails; record real explorer transaction.
   - Handed off deployed address to Lead for Phase 2 end-to-end integration with Agent B routes.
 - [x] [US-14] Hand off addresses, ABI and deploy commands to lead for human-approved locked README update; confirm before code freeze.
-  - Handed off contract address `0x5cA83f6072ABFF68fcaA84264830224B57EA12B1` to Lead.
+  - Handed off contract address `0x5af642ed0427567b0dfd5ecd9474f174dbda8420` to Lead.
 
 ## Notes
 
