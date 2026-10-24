@@ -424,8 +424,13 @@ function resolveBuilding(state: GameState, dtMs: number, events: MatchEvent[]): 
   if (stack.completed >= stack.total) {
     const score = scoreFor(state, side)
     score.objectiveComplete = true
-    score.completionMs = Math.round(state.halfElapsedMs)
-    emit(state, events, 'STACK_COMPLETE', null, { side, completionMs: score.completionMs })
+    // The stack can be knocked down and rebuilt inside one half. The tie-break in
+    // authoritativeWinner compares how fast the objective was reached, so the first
+    // completion is the one that counts; a later rebuild must not overwrite it.
+    if (score.completionMs === null) {
+      score.completionMs = Math.round(state.halfElapsedMs)
+      emit(state, events, 'STACK_COMPLETE', null, { side, completionMs: score.completionMs })
+    }
   }
 }
 

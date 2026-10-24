@@ -97,6 +97,53 @@ describe('BOAI deterministic match engine', () => {
     expect(state.stack.completed).toBeGreaterThan(0)
   })
 
+  it('keeps the first stack completion time when the stack is knocked down and rebuilt', () => {
+    // Seed `s-67` is a real match, not a contrived state. Red completes the stack at 13.6s
+    // of half 1, blue knocks it down at 16.1s, and red rebuilds it to full at 24.2s. Both
+    // sides finish the objective, so `authoritativeWinner` decides on `completionMs`.
+    const totalTicks = (MATCH.halfDurationMs * 2 + MATCH.halftimeDurationMs) / MATCH.tickMs + 5
+    const { state, events } = advanceTo(newMatch('s-67'), totalTicks)
+    expect(state.phase).toBe('FINISHED')
+
+    // Proof that a rebuild really happened: red reached a full stack twice in one half,
+    // with a knockdown in between. Without that, this test would pass trivially.
+    const redFullStacks = events.filter(
+      event => event.kind === 'STACK_PIECE' && event.payload.side === 'red' && event.payload.completed === event.payload.total,
+    )
+    expect(redFullStacks.length).toBeGreaterThan(1)
+    const firstKnockdown = events.findIndex(event => event.kind === 'STACK_KNOCKED')
+    expect(firstKnockdown).toBeGreaterThan(-1)
+    expect(events.indexOf(redFullStacks[1])).toBeGreaterThan(firstKnockdown)
+
+    // Half-relative time, so half 2 events (offset by the half duration) compare directly.
+    const halfElapsedOf = (atMs: number) => (atMs >= MATCH.halfDurationMs ? atMs - MATCH.halfDurationMs : atMs)
+    const firstRedCompletion = halfElapsedOf(redFullStacks[0].atMs)
+    const redRebuild = halfElapsedOf(redFullStacks[1].atMs)
+    expect(state.redScore.completionMs).toBe(firstRedCompletion)
+    expect(state.redScore.completionMs).toBeLessThan(redRebuild)
+
+    // Strongest form: for every side, the stored time is the first STACK_COMPLETE of the
+    // match and the earliest full stack of that side, and never a rebuild.
+    for (const side of ['red', 'blue'] as const) {
+      const score = side === 'red' ? state.redScore : state.blueScore
+      expect(score.objectiveComplete).toBe(true)
+      const completes = events.filter(event => event.kind === 'STACK_COMPLETE' && event.payload.side === side)
+      expect(completes.length).toBeGreaterThan(0)
+      const firstFullStack = events.find(
+        event => event.kind === 'STACK_PIECE' && event.payload.side === side && event.payload.completed === event.payload.total,
+      )
+      expect(firstFullStack).toBeDefined()
+      expect(score.completionMs).toBe(completes[0].payload.completionMs)
+      expect(score.completionMs).toBe(halfElapsedOf(firstFullStack!.atMs))
+      expect(score.completionMs).toBeLessThanOrEqual(MATCH.halfDurationMs)
+    }
+
+    // Both sides completed, so the winner is the faster first completion: blue 12.6s vs red 13.6s.
+    expect(state.redScore.completionMs).toBe(13600)
+    expect(state.blueScore.completionMs).toBe(12600)
+    expect(state.winnerSide).toBe('blue')
+  })
+
   it('never ends a match 0-0 across many seeds', () => {
     const totalTicks = (MATCH.halfDurationMs * 2 + MATCH.halftimeDurationMs) / MATCH.tickMs + 5
     const draws: string[] = []
