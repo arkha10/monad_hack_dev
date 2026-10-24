@@ -82,6 +82,21 @@ export class MatchDurableObject {
     this.timer = null
   }
 
+  /**
+   * A match started over plain HTTP has no socket driving it, and the interval only exists
+   * while a socket is attached. Advancing against the wall clock on every read keeps the
+   * snapshot correct regardless of transport, and is a no-op once the match is finished.
+   */
+  private catchUp(matchId: string): void {
+    const snapshot = this.service().view(matchId).snapshot
+    if (snapshot.phase === 'FINISHED') return
+    try {
+      this.sessionFor(matchId).advanceTo(this.targetTick(snapshot))
+    } catch {
+      this.stopLoop()
+    }
+  }
+
   async fetch(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
@@ -130,9 +145,11 @@ export class MatchDurableObject {
       return Response.json(this.service().init(body))
     }
     if (route === 'view' && method === 'GET') {
+      this.catchUp(matchId)
       return Response.json(this.service().view(matchId))
     }
     if (route === 'events' && method === 'GET') {
+      this.catchUp(matchId)
       const afterSeq = Number(url.searchParams.get('afterSeq') ?? '0')
       const events: MatchEvent[] = this.service().events(matchId, Number.isFinite(afterSeq) ? afterSeq : 0)
       return Response.json(events)

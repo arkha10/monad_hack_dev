@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it, vi } from 'vitest'
 import type { AgentSlot, Behavior, ServerWsMessage } from '@boai/shared/types'
 import type { MatchInitRequest } from '../src/routes/doProtocol'
 import { MATCH } from '../src/game/ruleset'
@@ -211,6 +211,40 @@ describe('MatchSession fan-out', () => {
     expect(leaving.sent).toHaveLength(0)
     expect(parse(staying.sent).some(message => message.type === 'MATCH_SNAPSHOT')).toBe(true)
     f.close()
+  })
+  it('advances a match read over plain HTTP with no socket attached', async () => {
+    vi.useFakeTimers()
+    try {
+      const startedAt = Date.parse('2026-10-24T05:00:00.000Z')
+      vi.setSystemTime(startedAt)
+      const store = new MemorySqlStore()
+      const durable = durableObject(store)
+      await durable.fetch(
+        new Request(`https://do.internal/${MATCH_ID}/init`, { method: 'POST', body: JSON.stringify(initRequest()) }),
+      )
+
+      const first = (await (await durable.fetch(new Request(`https://do.internal/${MATCH_ID}/view`))).json()) as {
+        snapshot: { seq: number; remainingMs: number }
+      }
+      expect(first.snapshot.seq).toBe(0)
+
+      // Five seconds of wall clock with no WebSocket driving the loop.
+      vi.setSystemTime(startedAt + 5_000)
+      const later = (await (await durable.fetch(new Request(`https://do.internal/${MATCH_ID}/view`))).json()) as {
+        snapshot: { seq: number; remainingMs: number }
+      }
+
+      expect(later.snapshot.seq).toBeGreaterThan(first.snapshot.seq)
+      expect(later.snapshot.remainingMs).toBeLessThan(first.snapshot.remainingMs)
+
+      const events = (await (
+        await durable.fetch(new Request(`https://do.internal/${MATCH_ID}/events?afterSeq=0`))
+      ).json()) as unknown[]
+      expect(events.length).toBeGreaterThan(0)
+      store.close()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
