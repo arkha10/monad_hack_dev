@@ -40,14 +40,41 @@ function readCookie(request: Request, name: string): string | null {
   return null
 }
 
-export async function issueDevSession(env: Env, userId: string): Promise<string> {
-  const payload = encodeBase64Url(new TextEncoder().encode(JSON.stringify({ sub: userId, iat: Date.now() })))
+export async function hashPassword(password: string, salt: string): Promise<string> {
+  const enc = new TextEncoder()
+  const data = enc.encode(`${salt}:${password}`)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
+}
+
+export function generateSalt(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+}
+
+export async function issueDevSession(env: Env, userId: string, username?: string): Promise<string> {
+  const payload = encodeBase64Url(
+    new TextEncoder().encode(
+      JSON.stringify({
+        sub: userId,
+        username: username ?? undefined,
+        displayName: username ?? undefined,
+        iat: Date.now(),
+      }),
+    ),
+  )
   const signature = await crypto.subtle.sign('HMAC', await hmacKey(env), new TextEncoder().encode(payload))
   return `${payload}.${encodeBase64Url(new Uint8Array(signature))}`
 }
 
 async function readDevSession(env: Env, request: Request): Promise<VerifiedIdentity | null> {
-  const raw = readCookie(request, SESSION_COOKIE)
+  let raw = readCookie(request, SESSION_COOKIE)
+  if (!raw) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      raw = authHeader.slice(7).trim()
+    }
+  }
   if (!raw) return null
   const [payload, signature] = raw.split('.')
   if (!payload || !signature) return null
@@ -59,9 +86,18 @@ async function readDevSession(env: Env, request: Request): Promise<VerifiedIdent
   )
   if (!valid) return null
   try {
-    const parsed = JSON.parse(new TextDecoder().decode(decodeBase64Url(payload))) as { sub?: string }
+    const parsed = JSON.parse(new TextDecoder().decode(decodeBase64Url(payload))) as {
+      sub?: string
+      username?: string
+      displayName?: string
+    }
     if (!parsed.sub) return null
-    return { userId: parsed.sub, isGuest: true, displayName: 'Pemain Tamu' }
+    return {
+      userId: parsed.sub,
+      isGuest: !parsed.username,
+      displayName: parsed.displayName ?? parsed.username ?? 'Pemain Tamu',
+      username: parsed.username ?? null,
+    }
   } catch {
     return null
   }

@@ -4,6 +4,8 @@ import { verifyMessage } from 'viem'
 import {
   clearDevSessionCookie,
   devSessionCookie,
+  generateSalt,
+  hashPassword,
   issueDevSession,
   requireIdentity,
   resolveIdentity,
@@ -48,7 +50,7 @@ const SIGNATURE_PATTERN = /^0x[0-9a-fA-F]{130}$/
 const NONCE_LINE = /^Nonce: (.+)$/m
 
 type HttpMethod = 'GET' | 'POST' | 'PUT'
-type IdentityMode = 'required' | 'mint-guest'
+type IdentityMode = 'required' | 'mint-guest' | 'optional'
 
 interface RouteContext {
   request: Request
@@ -159,10 +161,148 @@ const ROUTES: readonly RouteDefinition[] = [
     identity: 'mint-guest',
     handler: async ({ env, identity }) => {
       const profile = await ledgerFetch<AuthenticatedProfile>(env, identity.userId, '/sync', {
-        displayName: identity.displayName ?? 'Pemain BOAI',
+        displayName: identity.username ?? identity.displayName ?? 'Pemain BOAI',
         isGuest: identity.isGuest,
       })
-      return ok(profile, env)
+      return ok({ ...profile, username: identity.username ?? null }, env)
+    },
+  },
+  {
+    method: 'POST',
+    segments: ['auth', 'register'],
+    identity: 'optional',
+    handler: async ({ env, request }) => {
+      const body = await readJson<{ username?: unknown; password?: unknown }>(request)
+      const rawUsername = typeof body.username === 'string' ? body.username.trim() : ''
+      const password = typeof body.password === 'string' ? body.password : ''
+
+      if (!/^[a-zA-Z0-9_-]{3,20}$/.test(rawUsername)) {
+        throw new HttpError(
+          'INVALID_USERNAME',
+          'Username harus 3-20 karakter alfanumerik (huruf, angka, _, -)',
+          400,
+        )
+      }
+      if (password.length < 6) {
+        throw new HttpError('INVALID_PASSWORD', 'Password minimal 6 karakter', 400)
+      }
+
+      const salt = generateSalt()
+      const passwordHash = await hashPassword(password, salt)
+      const newUserId = `u_${crypto.randomUUID()}`
+
+      const registered = await ledgerFetch<{ ok: boolean; reason?: string; user?: { username: string; userId: string } }>(
+        env,
+        'auth_registry',
+        '/auth/register',
+        {
+          username: rawUsername,
+          passwordHash,
+          salt,
+          newUserId,
+        },
+      )
+
+      if (!registered.ok) {
+        if (registered.reason === 'USERNAME_EXISTS') {
+          throw new HttpError('USERNAME_EXISTS', 'Username sudah terdaftar. Silakan pilih username lain.', 409)
+        }
+        throw new HttpError('REGISTER_FAILED', 'Gagal mendaftarkan akun.', 400)
+      }
+
+      const profile = await ledgerFetch<AuthenticatedProfile>(env, newUserId, '/sync', {
+        displayName: rawUsername,
+        isGuest: false,
+      })
+
+      const token = await issueDevSession(env, newUserId, rawUsername)
+      const cookie = devSessionCookie(token, undefined, env.BOAI_ENV === 'production')
+      const response = ok(
+        {
+          user: {
+            ...profile,
+            username: rawUsername,
+          },
+          token,
+        },
+        env,
+      )
+      response.headers.append('set-cookie', cookie)
+      return response
+    },
+  },
+  {
+    method: 'POST',
+    segments: ['auth', 'login'],
+    identity: 'optional',
+    handler: async ({ env, request }) => {
+      const body = await readJson<{ username?: unknown; password?: unknown }>(request)
+      const rawUsername = typeof body.username === 'string' ? body.username.trim() : ''
+      const password = typeof body.password === 'string' ? body.password : ''
+
+      if (!rawUsername || !password) {
+        throw new HttpError('INVALID_CREDENTIALS', 'Username dan password wajib diisi', 400)
+      }
+
+      const lookup = await ledgerFetch<{
+        found: boolean
+        user?: { username: string; userId: string; passwordHash: string; salt: string }
+      }>(env, 'auth_registry', '/auth/get', { username: rawUsername })
+
+      if (!lookup.found || !lookup.user) {
+        throw new HttpError('UNAUTHORIZED', 'Username atau password salah', 401)
+      }
+
+      const expectedHash = await hashPassword(password, lookup.user.salt)
+      if (expectedHash !== lookup.user.passwordHash) {
+        throw new HttpError('UNAUTHORIZED', 'Username atau password salah', 401)
+      }
+
+      const profile = await ledgerFetch<AuthenticatedProfile>(env, lookup.user.userId, '/sync', {
+        displayName: lookup.user.username,
+        isGuest: false,
+      })
+
+      const token = await issueDevSession(env, lookup.user.userId, lookup.user.username)
+      const cookie = devSessionCookie(token, undefined, env.BOAI_ENV === 'production')
+      const response = ok(
+        {
+          user: {
+            ...profile,
+            username: lookup.user.username,
+          },
+          token,
+        },
+        env,
+      )
+      response.headers.append('set-cookie', cookie)
+      return response
+    },
+  },
+  {
+    method: 'POST',
+    segments: ['auth', 'logout'],
+    identity: 'optional',
+    handler: async ({ env }) => {
+      const response = ok({ loggedOut: true }, env)
+      response.headers.append('set-cookie', clearDevSessionCookie(env.BOAI_ENV === 'production'))
+      return response
+    },
+  },
+  {
+    method: 'GET',
+    segments: ['auth', 'me'],
+    identity: 'required',
+    handler: async ({ env, identity }) => {
+      return ok(
+        {
+          userId: identity.userId,
+          username: identity.username ?? null,
+          displayName: identity.displayName ?? 'Pemain BOAI',
+          isGuest: identity.isGuest,
+        },
+        env,
+      )
     },
   },
   {
@@ -473,10 +613,16 @@ async function resolveRouteIdentity(
   if (mode === 'required') return { identity: await requireIdentity(request, env), cookie: null }
   const existing = await resolveIdentity(request, env)
   if (existing) return { identity: existing, cookie: null }
+  if (mode === 'optional') {
+    return {
+      identity: { userId: '', isGuest: true, displayName: null, sessionToken: null, username: null },
+      cookie: null,
+    }
+  }
   const userId = crypto.randomUUID()
   const token = await issueDevSession(env, userId)
   return {
-    identity: { userId, isGuest: true, displayName: 'Pemain Tamu', sessionToken: token },
+    identity: { userId, isGuest: true, displayName: 'Pemain Tamu', sessionToken: token, username: null },
     cookie: devSessionCookie(token, undefined, env.BOAI_ENV === 'production'),
   }
 }

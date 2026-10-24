@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { CreditBalance, MatchResult, MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
+import type { AuthenticatedProfile, CreditBalance, MatchResult, MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
 import { buildExplorerTxUrl, parseBehavior } from "@boai/shared/helpers";
 import { SEED } from "@boai/shared/seed";
 import { API_BASE_URL, api } from "./lib/api";
-import { getSession, googleLogin, guestLogin, signOut, supabase } from "./lib/auth";
+import {
+  getSession,
+  login as authLogin,
+  register as authRegister,
+  guestLogin,
+  signOut,
+  type CurrentUser,
+} from "./lib/auth";
 import { useWallet } from "./lib/web3/useWallet";
 import { WalletPage } from "./routes/Wallet";
 import { RewardsPage } from "./routes/Rewards";
@@ -33,6 +40,7 @@ const navGlyphs: Record<(typeof links)[number][0], string> = {
 
 function Shell({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const wallet = useWallet();
 
@@ -47,10 +55,23 @@ function Shell({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const session = await getSession();
+      setCurrentUser(session);
+      setOnline(Boolean(session));
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
-    getSession().then((value) => setOnline(Boolean(value)));
+    void refreshUser();
     void refreshCredits();
-    const interval = setInterval(refreshCredits, 8000);
+    const interval = setInterval(() => {
+      void refreshCredits();
+      void refreshUser();
+    }, 8000);
     return () => clearInterval(interval);
   }, []);
 
@@ -91,7 +112,14 @@ function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           )}
 
-          <span className="session-dot">{online ? "● ONLINE" : "○ GUEST"}</span>
+          {currentUser?.username ? (
+            <Link to="/profile" className="user-chip" title={`Akun: @${currentUser.username}`}>
+              <span className="user-icon">👤</span>
+              <span className="user-name">@{currentUser.username}</span>
+            </Link>
+          ) : null}
+
+          <span className="session-dot">{currentUser?.username ? "● ONLINE" : online ? "● ONLINE" : "○ GUEST"}</span>
         </div>
       </header>
       {children}
@@ -115,20 +143,80 @@ function Notice({
 
 function Home() {
   const navigate = useNavigate();
-  const [message, setMessage] = useState("");
-  const login = async (kind: "guest" | "google") => {
-    try {
-      if (kind === "guest") await guestLogin();
-      else await googleLogin();
-      if (kind === "guest") {
-        navigate("/team");
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    void getSession().then((user) => {
+      if (user && user.username) {
+        setCurrentUser(user);
+      }
+    });
+  }, []);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const cleanUsername = username.trim();
+    if (!cleanUsername) {
+      setErrorMessage("Silakan masukkan username");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]{3,20}$/.test(cleanUsername)) {
+      setErrorMessage("Username harus 3-20 karakter alfanumerik (huruf, angka, _, -)");
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMessage("Password minimal 6 karakter");
+      return;
+    }
+
+    if (authMode === "register") {
+      if (password !== confirmPassword) {
+        setErrorMessage("Konfirmasi kata sandi tidak cocok");
         return;
       }
-      setMessage("Mengarahkan ke Google...");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Login gagal");
+    }
+
+    setLoading(true);
+    try {
+      if (authMode === "register") {
+        const user = await authRegister(cleanUsername, password);
+        setSuccessMessage(`Akun @${user.username} berhasil didaftarkan! Mengarahkan ke arena...`);
+        setTimeout(() => navigate("/team"), 800);
+      } else {
+        const user = await authLogin(cleanUsername, password);
+        setSuccessMessage(`Selamat datang kembali, @${user.username}! Mengarahkan...`);
+        setTimeout(() => navigate("/team"), 600);
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Autentikasi gagal");
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handleGuestLogin = async () => {
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      await guestLogin();
+      navigate("/team");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Gagal masuk sebagai tamu");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <main className="hero">
@@ -146,21 +234,114 @@ function Home() {
           membaca prompt Anda, mengejar bola, menjaga tumpukan, dan membangun
           kembali menara genteng.
         </p>
-        <div className="hero-actions">
-          <button onClick={() => login("guest")}>
-            Masuk sebagai Guest <span>↗</span>
-          </button>
-          {supabase ? (
-            <button className="secondary" onClick={() => login("google")}>
-              Masuk dengan Google
-            </button>
-          ) : (
-            <button className="secondary" disabled>
-              Google belum dikonfigurasi
-            </button>
-          )}
-        </div>
-        {message && <Notice>{message}</Notice>}
+
+        {currentUser?.username ? (
+          <div className="hero-auth-box logged-in">
+            <p className="welcome-tag">AKUN AKTIF</p>
+            <h3>Selamat Datang, @{currentUser.username}</h3>
+            <p className="muted" style={{ margin: "8px 0" }}>Akun Anda siap untuk bermain Boi-boian PvP atau Latihan.</p>
+            <div className="hero-actions" style={{ marginTop: "14px" }}>
+              <button onClick={() => navigate("/team")}>
+                Lanjut ke Tim Saya <span>➔</span>
+              </button>
+              <button className="secondary" onClick={() => navigate("/practice")}>
+                Main Latihan
+              </button>
+              <button className="secondary" onClick={() => navigate("/profile")}>
+                Lihat Profil
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="hero-auth-box">
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={`auth-tab ${authMode === "login" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("login");
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                }}
+              >
+                Masuk Akun
+              </button>
+              <button
+                type="button"
+                className={`auth-tab ${authMode === "register" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("register");
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                }}
+              >
+                Daftar Baru
+              </button>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} className="auth-form">
+              <div className="form-group">
+                <label htmlFor="auth-username">Username</label>
+                <input
+                  id="auth-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="misal: arkha_pro"
+                  autoComplete="username"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="auth-password">Password</label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Minimal 6 karakter"
+                  autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                  required
+                />
+              </div>
+
+              {authMode === "register" && (
+                <div className="form-group">
+                  <label htmlFor="auth-confirm">Konfirmasi Password</label>
+                  <input
+                    id="auth-confirm"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Ulangi kata sandi"
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+              )}
+
+              <button type="submit" className="auth-submit-btn" disabled={loading}>
+                {loading
+                  ? "Memproses..."
+                  : authMode === "login"
+                  ? "Masuk ke Arena ➔"
+                  : "Daftar Akun Baru ➔"}
+              </button>
+            </form>
+
+            {errorMessage && <Notice tone="error">{errorMessage}</Notice>}
+            {successMessage && <Notice tone="info">{successMessage}</Notice>}
+
+            <div className="guest-fallback">
+              <span className="muted">Atau coba langsung tanpa daftar:</span>
+              <button type="button" className="guest-link-btn" onClick={handleGuestLogin} disabled={loading}>
+                Masuk sebagai Guest (Tamu) ↗
+              </button>
+            </div>
+          </div>
+        )}
+
         <p className="microcopy">
           AI Agent di BOAI adalah simulasi rule based yang dapat dijelaskan.
           Tidak ada LLM aktif.
@@ -1004,10 +1185,14 @@ function ShopPage() {
 }
 
 function ProfilePage() {
+  const [profile, setProfile] = useState<AuthenticatedProfile | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const wallet = useWallet();
 
   useEffect(() => {
+    api.syncIdentity().then((res) => {
+      if (res && res.data) setProfile(res.data);
+    }).catch(() => {});
     api.getCredits().then((res) => {
       if (res && res.data) setCredits(res.data);
     }).catch(() => {});
@@ -1017,13 +1202,39 @@ function ProfilePage() {
     await signOut();
     window.location.assign("/");
   };
+
+  const usernameDisplay = profile?.username
+    ? `@${profile.username}`
+    : profile?.isGuest
+    ? "Guest Player"
+    : profile?.displayName ?? "Pemain BOAI";
+  const avatarLetter = profile?.username
+    ? profile.username.charAt(0).toUpperCase()
+    : profile?.isGuest
+    ? "G"
+    : "P";
+
   return (
     <main className="content narrow">
       <p className="eyebrow">PROFILE · SESSION</p>
       <h1>Profil pemain</h1>
       <div className="panel profile-card">
-        <span className="avatar">G</span>
-        <h2>Guest Player</h2>
+        <span className="avatar">{avatarLetter}</span>
+        <h2>{usernameDisplay}</h2>
+        {profile?.username ? (
+          <div className="user-registered-tag">
+            <span className="badge">Akun Terdaftar</span>
+            <span className="mono" style={{ fontSize: "0.75rem", color: "var(--parchment-soft)", marginLeft: "8px" }}>
+              ID: {profile.userId}
+            </span>
+          </div>
+        ) : (
+          <div className="user-registered-tag">
+            <span className="badge" style={{ borderColor: "var(--line)", color: "var(--parchment-soft)" }}>
+              Sesi Tamu (Guest)
+            </span>
+          </div>
+        )}
         <div className="credit-metric-box" style={{ margin: "16px 0", textAlign: "left" }}>
           <small>SALDO KREDIT BOAI</small>
           <div className="metric-val">🪙 {credits?.available ?? 100}</div>
@@ -1042,42 +1253,20 @@ function ProfilePage() {
             Kelola Dompet & Web3
           </Link>
           <button className="secondary" onClick={logout}>
-            Keluar
+            Keluar (Logout)
           </button>
         </div>
       </div>
     </main>
   );
 }
-function SimplePage({ title, eyebrow }: { title: string; eyebrow: string }) {
-  return (
-    <main className="content narrow">
-      <p className="eyebrow">{eyebrow}</p>
-      <h1>{title}</h1>
-      {eyebrow === "WEB3" && (
-        <img
-          className="practice-art"
-          src="/art/boai-badges.png"
-          alt="Badge BOAI_CREDIT dan testnet"
-        />
-      )}
-      <Notice>
-        Halaman ini disiapkan untuk pemilik jalur terkait. Status layanan akan
-        tampil dari API saat tersedia.
-      </Notice>
-    </main>
-  );
-}
+
 
 export function App() {
   return (
     <Shell>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route
-          path="/auth/callback"
-          element={<SimplePage title="Auth callback" eyebrow="AUTH" />}
-        />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/practice" element={<PracticePage />} />
         <Route path="/queue" element={<QueuePage />} />

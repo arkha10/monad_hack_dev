@@ -76,6 +76,13 @@ const SCHEMA = [
     updated_at INTEGER,
     PRIMARY KEY(match_id, user_id)
   )`,
+  `CREATE TABLE IF NOT EXISTS user_auth (
+    username TEXT PRIMARY KEY,
+    user_id TEXT UNIQUE,
+    password_hash TEXT,
+    salt TEXT,
+    created_at INTEGER
+  )`,
 ]
 
 const STARTER_REF = 'starter'
@@ -254,6 +261,55 @@ export class LedgerService {
       this.now(),
     )
     return { ok: true, balance: { ...next, unit: 'BOAI_CREDIT' }, reason: null }
+  }
+
+  registerUser(
+    username: string,
+    passwordHash: string,
+    salt: string,
+    newUserId: string,
+  ): { ok: boolean; reason?: string; user?: { username: string; userId: string } } {
+    return this.sql.transaction(() => {
+      const existing = one<{ user_id: string }>(
+        this.sql,
+        'SELECT user_id FROM user_auth WHERE LOWER(username) = LOWER(?)',
+        username,
+      )
+      if (existing) {
+        return { ok: false, reason: 'USERNAME_EXISTS' }
+      }
+      run(
+        this.sql,
+        'INSERT INTO user_auth (username, user_id, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)',
+        username,
+        newUserId,
+        passwordHash,
+        salt,
+        this.now(),
+      )
+      return { ok: true, user: { username, userId: newUserId } }
+    })
+  }
+
+  getUserAuth(username: string): {
+    found: boolean
+    user?: { username: string; userId: string; passwordHash: string; salt: string }
+  } {
+    const row = one<{ username: string; user_id: string; password_hash: string; salt: string }>(
+      this.sql,
+      'SELECT username, user_id, password_hash, salt FROM user_auth WHERE LOWER(username) = LOWER(?)',
+      username,
+    )
+    if (!row) return { found: false }
+    return {
+      found: true,
+      user: {
+        username: row.username,
+        userId: row.user_id,
+        passwordHash: row.password_hash,
+        salt: row.salt,
+      },
+    }
   }
 
   syncProfile(userId: string, input: LedgerSyncRequest): AuthenticatedProfile {

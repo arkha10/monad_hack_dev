@@ -12,9 +12,13 @@ async function request<T>(
   const session = await getSession();
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
-  if (session?.access_token)
-    headers.set("authorization", `Bearer ${session.access_token}`);
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  if (session?.token)
+    headers.set("authorization", `Bearer ${session.token}`);
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+    credentials: "same-origin",
+  });
   const body = (await response.json()) as {
     data?: T;
     requestId?: string;
@@ -29,6 +33,16 @@ async function request<T>(
 
 export const api: BoaiDataLayer = {
   syncIdentity: () => request("/api/v1/identity/sync", { method: "POST" }),
+  register: (username, password) =>
+    request("/api/v1/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  login: (username, password) =>
+    request("/api/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
   getTeam: () => request("/api/v1/team"),
   saveTeam: (team) =>
     request("/api/v1/team", { method: "PUT", body: JSON.stringify(team) }),

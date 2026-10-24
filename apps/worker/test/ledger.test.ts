@@ -423,4 +423,50 @@ describe('durable object dispatch', () => {
     const read = await callDo('/team/get', { userId: USER })
     expect((await read.json() as { id: string }).id).toBe(`team-${USER}`)
   })
+
+  it('registers and looks up user credentials via /auth/register and /auth/get', async () => {
+    const regRes = await callDo('/auth/register', {
+      userId: 'auth_registry',
+      username: 'player_one',
+      passwordHash: 'hash123',
+      salt: 'salt123',
+      newUserId: 'u-player-1',
+    })
+    expect(await regRes.json()).toEqual({
+      ok: true,
+      user: { username: 'player_one', userId: 'u-player-1' },
+    })
+
+    const dupRes = await callDo('/auth/register', {
+      userId: 'auth_registry',
+      username: 'PLAYER_ONE',
+      passwordHash: 'hash999',
+      salt: 'salt999',
+      newUserId: 'u-player-2',
+    })
+    expect(await dupRes.json()).toEqual({
+      ok: false,
+      reason: 'USERNAME_EXISTS',
+    })
+
+    const getRes = await callDo('/auth/get', {
+      userId: 'auth_registry',
+      username: 'Player_One',
+    })
+    expect(await getRes.json()).toEqual({
+      found: true,
+      user: {
+        username: 'player_one',
+        userId: 'u-player-1',
+        passwordHash: 'hash123',
+        salt: 'salt123',
+      },
+    })
+
+    const notFound = await callDo('/auth/get', {
+      userId: 'auth_registry',
+      username: 'nonexistent_user',
+    })
+    expect(await notFound.json()).toEqual({ found: false })
+  })
 })

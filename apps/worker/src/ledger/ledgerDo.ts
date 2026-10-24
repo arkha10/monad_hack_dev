@@ -131,6 +131,17 @@ export class LedgerDurableObject {
             return Response.json(
               ledger.upsertRewardClaim(userId, rewardClaim(body), integer(body, 'nowMs')),
             )
+          case '/auth/register':
+            return Response.json(
+              ledger.registerUser(
+                text(body, 'username'),
+                text(body, 'passwordHash'),
+                text(body, 'salt'),
+                text(body, 'newUserId'),
+              ),
+            )
+          case '/auth/get':
+            return Response.json(ledger.getUserAuth(text(body, 'username')))
           default:
             return Response.json({ error: `Rute tidak dikenali: ${path}` }, { status: 400 })
         }

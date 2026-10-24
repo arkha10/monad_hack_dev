@@ -2,6 +2,8 @@ import type { Team, MatchSnapshot, MatchResult, MatchEvent, CreditBalance, Cosme
 
 export interface BoaiDataLayer {
   syncIdentity(): Promise<ApiEnvelope<AuthenticatedProfile>>
+  register?(username: string, password: string): Promise<ApiEnvelope<{ user: AuthenticatedProfile; token: string }>>
+  login?(username: string, password: string): Promise<ApiEnvelope<{ user: AuthenticatedProfile; token: string }>>
   getTeam(): Promise<ApiEnvelope<Team>>
   saveTeam(team: Pick<Team, 'name' | 'agents'>): Promise<ApiEnvelope<Team>>
   startPractice(difficulty: Difficulty, teamId: TeamId): Promise<ApiEnvelope<{ matchId: MatchId }>>

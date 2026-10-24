@@ -32,7 +32,12 @@ Dua tim berisi 5 AI Agent (Tim Merah vs Tim Biru) bertanding dalam arena 2D dete
 - **Match HUD & Timer**: Hitung mundur babak pertandingan, indikator Half 1 / Half 2, dan skor tim.
 - **Interactive Coach Bar**: Tombol taktik interaktif pelatih yang langsung mempengaruhi AI engine pertandingan secara live.
 
-### 2. Dompet Kredit & Web3 Wallet Terintegrasi
+### 2. Autentikasi Akun Mandiri (Username & Password)
+- **Registrasi & Login Manual**: Pemain dapat mendaftar dengan memilih username unik (3-20 karakter) dan password aman dengan hashing SHA-256 + cryptographic salt.
+- **Badge Akun & Status**: Menampilkan chip profil `👤 @username` dan status `ONLINE` di navbar serta profil pemain.
+- **Opsi Tamu (Guest)**: Opsi onboarding cepat tanpa registrasi untuk evaluasi instan.
+
+### 3. Dompet Kredit & Web3 Wallet Terintegrasi
 - **Credit Pill di Header**: Menampilkan saldo kredit live pemain (`🪙 100 Kredit`) di navigasi atas.
 - **Halaman Dompet Lengkap (`/wallet`)**:
   - Saldo Kredit In-Game (`available` & `reserved`).
@@ -40,7 +45,7 @@ Dua tim berisi 5 AI Agent (Tim Merah vs Tim Biru) bertanding dalam arena 2D dete
   - Integrasi wallet EVM (MetaMask, Rabby, dll.) di Monad Testnet.
   - Verifikasi tanda tangan gasless (EIP-191 `personal_sign`).
 
-### 3. Smart Contract & Monad Relayer (`BOAIArena.sol`)
+### 4. Smart Contract & Monad Relayer (`BOAIArena.sol`)
 - **On-chain Match Recording**: Mencatat `matchId`, `winner`, `replayHash`, `rulesetHash`, dan `resultHash` ke Monad Testnet.
 - **Demo Reward Distribution**: Mengklaim 1 token ERC-20 `BOAI-DEMO` langsung ke wallet pemenang yang terverifikasi.
 - **Automated Relayer**: Backend Cloudflare Worker mengeksekusi transaksi on-chain otomatis tanpa membebani biaya gas ke pemain.
@@ -50,7 +55,7 @@ Dua tim berisi 5 AI Agent (Tim Merah vs Tim Biru) bertanding dalam arena 2D dete
 ## ⏱️ Panduan Penjurian 3 Menit (Judging Walkthrough)
 
 1. Buka aplikasi web di [https://boai-api.arkha10-boai.workers.dev/](https://boai-api.arkha10-boai.workers.dev/).
-2. Klik **"Masuk sebagai Tamu"** — Akun tamu dibuat instan dan langsung diberikan **100 Starter BOAI_CREDIT**.
+2. Daftarkan akun baru dengan **Username & Password** (atau klik **"Masuk sebagai Tamu"**) — Akun langsung aktif dengan badge username unik dan diberikan **100 Starter BOAI_CREDIT**.
 3. Perhatikan badge **🪙 100 Kredit** dan tombol **⚡ Hubungkan Wallet** di navbar atas.
 4. Buka menu **"Latihan"** (`/practice`), pilih tingkat kesulitan **Mudah (Easy)**, dan klik **"Mulai Pertandingan"**.
 5. Saksikan pertandingan live 10 AI Agent:

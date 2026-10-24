@@ -120,6 +120,92 @@ describe('handleApiRequest dispatch', () => {
     expect(response?.headers.get('set-cookie')).toContain('Secure')
   })
 
+  it('registers a user, prevents duplicates, and logs in with valid credentials', async () => {
+    const users = new Map<string, { username: string; userId: string; passwordHash: string; salt: string }>()
+    const env = createFakeEnv({
+      ledger: (path, body) => {
+        if (path === '/auth/register') {
+          const { username, passwordHash, salt, newUserId } = body as {
+            username: string
+            passwordHash: string
+            salt: string
+            newUserId: string
+          }
+          if (users.has(username.toLowerCase())) {
+            return { ok: false, reason: 'USERNAME_EXISTS' }
+          }
+          const user = { username, userId: newUserId, passwordHash, salt }
+          users.set(username.toLowerCase(), user)
+          return { ok: true, user: { username, userId: newUserId } }
+        }
+        if (path === '/auth/get') {
+          const { username } = body as { username: string }
+          const found = users.get(username.toLowerCase())
+          if (!found) return { found: false }
+          return { found: true, user: found }
+        }
+        if (path === '/sync') {
+          const { userId, displayName } = body as { userId: string; displayName: string }
+          return { userId, displayName, isGuest: false, teamId: null }
+        }
+        return undefined
+      },
+    })
+    env.BOAI_ENV = 'production'
+    env.CHAIN_INTERNAL_SECRET = 'auth-test-secret'
+
+    // 1. Register
+    const regReq = await jsonRequest('/api/v1/auth/register', 'POST', {
+      username: 'arkha_pro',
+      password: 'password123',
+    })
+    const regRes = await handleApiRequest(regReq, env)
+    expect(regRes?.status).toBe(200)
+    const regBody = await envelope(regRes as Response)
+    const data = regBody.data as { user: { username: string; isGuest: boolean; displayName: string }; token: string }
+    expect(data.user.username).toBe('arkha_pro')
+    expect(data.user.isGuest).toBe(false)
+    expect(data.token).toBeTruthy()
+    const regCookie = regRes?.headers.get('set-cookie') as string
+    expect(regCookie).toContain('boai_session=')
+
+    // 2. Prevent duplicate username
+    const dupReq = await jsonRequest('/api/v1/auth/register', 'POST', {
+      username: 'ARKHA_PRO',
+      password: 'newpassword123',
+    })
+    const dupRes = await handleApiRequest(dupReq, env)
+    expect(dupRes?.status).toBe(409)
+
+    // 3. Login with wrong password
+    const wrongReq = await jsonRequest('/api/v1/auth/login', 'POST', {
+      username: 'arkha_pro',
+      password: 'wrong_password',
+    })
+    const wrongRes = await handleApiRequest(wrongReq, env)
+    expect(wrongRes?.status).toBe(401)
+
+    // 4. Login with correct password
+    const loginReq = await jsonRequest('/api/v1/auth/login', 'POST', {
+      username: 'Arkha_Pro',
+      password: 'password123',
+    })
+    const loginRes = await handleApiRequest(loginReq, env)
+    expect(loginRes?.status).toBe(200)
+    const loginCookie = loginRes?.headers.get('set-cookie') as string
+    expect(loginCookie).toContain('boai_session=')
+
+    // 5. Auth me with session token in Authorization header
+    const token = (loginRes ? ((await envelope(loginRes.clone() as Response)).data as { token: string }).token : '')
+    const meReq = request('/api/v1/auth/me', {
+      headers: { authorization: `Bearer ${token}` },
+    })
+    const meRes = await handleApiRequest(meReq, env)
+    expect(meRes?.status).toBe(200)
+    const meBody = await envelope(meRes as Response)
+    expect((meBody.data as { username: string }).username).toBe('arkha_pro')
+  })
+
   it('rejects an anonymous team read with 401 UNAUTHORIZED', async () => {
     const env = createFakeEnv({})
 

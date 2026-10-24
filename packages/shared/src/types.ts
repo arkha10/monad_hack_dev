@@ -108,6 +108,11 @@ export interface AuthenticatedProfile { userId: UserId
 displayName: string
 isGuest: boolean
 teamId: TeamId | null
+username?: string | null
+}
+export interface AuthResponse {
+  user: AuthenticatedProfile
+  token: string
 }
 export interface ApiError { error: { code: string
 message: string

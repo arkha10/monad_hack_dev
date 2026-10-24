@@ -5,6 +5,7 @@ export interface VerifiedIdentity {
   userId: string
   isGuest: boolean
   displayName: string | null
+  username?: string | null
 }
 
 const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
