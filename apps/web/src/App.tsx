@@ -5,6 +5,8 @@ import { parseBehavior } from "@boai/shared/helpers";
 import { SEED } from "@boai/shared/seed";
 import { API_BASE_URL, api } from "./lib/api";
 import { getSession, googleLogin, guestLogin, signOut } from "./lib/auth";
+import { WalletPage } from "./routes/Wallet";
+import { RewardsPage } from "./routes/Rewards";
 
 const links = [
   ["/team", "Tim"],
@@ -13,6 +15,8 @@ const links = [
   ["/leaderboard", "Peringkat"],
   ["/shop", "Toko"],
   ["/profile", "Profil"],
+  ["/wallet", "Wallet"],
+  ["/rewards", "Hadiah"],
 ] as const;
 
 const navGlyphs: Record<(typeof links)[number][0], string> = {
@@ -22,6 +26,8 @@ const navGlyphs: Record<(typeof links)[number][0], string> = {
   "/leaderboard": "✦",
   "/shop": "▣",
   "/profile": "◉",
+  "/wallet": "◇",
+  "/rewards": "✧",
 };
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -795,14 +801,8 @@ export function App() {
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route
-          path="/wallet"
-          element={<SimplePage title="Wallet testnet" eyebrow="WEB3" />}
-        />
-        <Route
-          path="/rewards"
-          element={<SimplePage title="Hadiah testnet" eyebrow="WEB3" />}
-        />
+        <Route path="/wallet" element={<WalletPage />} />
+        <Route path="/rewards" element={<RewardsPage />} />
       </Routes>
     </Shell>
   );

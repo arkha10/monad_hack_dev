@@ -35,11 +35,12 @@
 
 ## Notes
 
-- Branch / commit / PR: main, lead integration commit pending
+- Branch / commit / PR: `integration/trial` at `b72ad4301847832f34573580bd0c388c766339fa`, not pushed yet
 - Phase0 locked SHA: 5b0d41be10674acd97e9120588ff04c28ea424d7, merged to origin/main by commit a29d453
-- Frontend work completed in this pass: team.id is read from GET /api/v1/team before practice and queue, missing Supabase configuration now fails honestly, MatchPage consumes MatchSnapshot and opens the frozen WebSocket ticket endpoint, and route ownership is recorded in apps/web/src/router.tsx.
+- Frontend integration: Agent C Wallet and Rewards pages are mounted at `/wallet` and `/rewards`, with both routes discoverable in the navigation. BOAI Sundanese 2D pixel art redesign is included.
+- Backend integration: Agent C chain handler is mounted at `/api/v1/chain/*`, using the Agent B authoritative winner and linked wallet lookups. Chain responses receive the configured CORS headers. `/health` reports Phase 2.
 - Live frontend URL: https://boai-arena-web.pages.dev
-- Backend URL: not deployed. apps/worker/src/index.ts still returns HTTP 501 for B and C routes.
-- Tests executed and observed outputs: npm run lint passed, npm run typecheck passed, npm run build passed, npm test passed with 3 tests, and all 12 browser history routes returned HTTP 200 from the Vite smoke server.
-- Known blockers: Agent B backend branch is not present on origin. Agent C has not supplied a deployed contract or real transaction evidence. Supabase OAuth and guest auth are not configured in the deployed environment. The C-owned Wallet and Rewards route components are not merged into the main router.
-- Handoff: BLOCKED. Owner: Agent B for apps/worker/src/index.ts and authoritative match APIs. Owner: Agent C for deployed Monad contract, secure chain adapter, and Wallet/Rewards route handoff.
+- Backend URL: no production URL is claimed. Local Worker smoke returned Phase 2 health, unauthenticated chain eligibility returned 401, and guest-authenticated eligibility returned the honest `CHAIN_NOT_CONFIGURED` response because local chain environment values are not provisioned.
+- Tests executed on the integrated branch: `npm run lint` passed, `npm run typecheck` passed, `npm run build` passed, and `npm test` passed with 13 files and 166 tests. `forge test --root contracts --network monad` could not run because Foundry is not installed on this machine. The Monad Testnet RPC returned chain ID 10143 and 2,926 bytes of contract code at the recorded address.
+- Known blockers: no production Worker URL or complete live claim flow is verified. Agent C's task file still contains contradictory deployment notes and does not provide the deployment transaction hash or block number. The repo's local build does not provision Worker secrets or contract address. Two-browser production WebSocket acceptance is not complete.
+- Handoff: READY FOR INTEGRATION on `integration/trial`; full deployment acceptance remains blocked on live runtime configuration and claim evidence.

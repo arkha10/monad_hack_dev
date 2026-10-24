@@ -2,8 +2,11 @@ import { handleApiRequest } from './routes/router'
 import { MatchmakerDurableObject } from './matchmaking/matchmakerDo'
 import { MatchDurableObject } from './ws/matchDo'
 import { LedgerDurableObject } from './ledger/ledgerDo'
-import { corsHeaders, fail } from './routes/http'
+import { corsHeaders, errorResponse, fail, HttpError } from './routes/http'
 import type { Env } from './routes/env'
+import { resolveIdentity } from './auth/session'
+import { getAuthoritativeWinner, getVerifiedLinkedWallet } from './routes/authority'
+import { handleChainRequest } from './chain'
 
 export type { Env, AuthenticatedRequestContext } from './routes/env'
 
@@ -19,7 +22,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/health') {
-      return Response.json({ ok: true, service: 'boai-api', phase: 1, ruleset: 'boai-blitz-v1' })
+      return Response.json({ ok: true, service: 'boai-api', phase: 2, ruleset: 'boai-blitz-v1' })
     }
 
     if (request.method === 'OPTIONS' && (url.pathname.startsWith('/api/') || url.pathname.startsWith(WS_PREFIX))) {
@@ -33,10 +36,28 @@ export default {
       return stub.fetch(new Request(new URL(`/ws/${matchId}${url.search}`, url.origin), request))
     }
 
-    // Agent C's chain module is mounted by the lead during the Phase 2 integration
-    // merge, so this branch stays buildable without owning apps/worker/src/chain/**.
     if (url.pathname.startsWith(CHAIN_PREFIX)) {
-      return fail(env, 'CHAIN_NOT_MOUNTED', 'Handler chain dipasang saat integrasi Phase 2', 501, false)
+      try {
+        const identity = await resolveIdentity(request, env)
+        const chainEnv: Record<string, string | undefined> = {
+          CHAIN_INTERNAL_SECRET: env.CHAIN_INTERNAL_SECRET,
+          CHAIN_RELAYER_PRIVATE_KEY: env.CHAIN_RELAYER_PRIVATE_KEY,
+          BOAI_COMMITMENT_SALT: env.BOAI_COMMITMENT_SALT,
+          MONAD_RPC_URL: env.MONAD_RPC_URL,
+          MONAD_CHAIN_ID: env.MONAD_CHAIN_ID,
+          BOAI_CONTRACT_ADDRESS: env.BOAI_CONTRACT_ADDRESS,
+        }
+        const response = await handleChainRequest(request, chainEnv, {
+          getAuthoritativeWinner: matchId => getAuthoritativeWinner(env, matchId),
+          getVerifiedLinkedWallet: userId => getVerifiedLinkedWallet(env, userId),
+        }, identity?.userId ?? null)
+        const headers = new Headers(response.headers)
+        for (const [name, value] of Object.entries(corsHeaders(env))) headers.set(name, value)
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+      } catch (error) {
+        if (error instanceof HttpError) return errorResponse(env, error)
+        return fail(env, 'CHAIN_UNAVAILABLE', 'Layanan chain sementara tidak tersedia.', 503, true)
+      }
     }
 
     const apiResponse = await handleApiRequest(request, env)
