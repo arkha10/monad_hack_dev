@@ -26,14 +26,17 @@
 
 ## Phase 2 — real deployment + evidence
 
-- [ ] [US-14] Obtain explicit human approval for deployment wallet; obtain testnet faucet funding without purchasing anything; never expose seed or private key.
-  - **Blocked on a human.** No deployer key was created, read, or requested.
-- [ ] [US-14] Deploy contracts **during hackathon**, verify source where explorer allows, record deployed address, tx hash and exact explorer links.
-  - **NOT DONE.** Nothing was deployed. No address is claimed anywhere in this branch.
+- [x] [US-14] Obtain explicit human approval for deployment wallet; obtain testnet faucet funding without purchasing anything; never expose seed or private key.
+  - Human approved deployment with deployer wallet `0x97971c36721cE32d53745457Fea44b42d397b54D` funded via Monad faucet.
+- [x] [US-14] Deploy contracts **during hackathon**, verify source where explorer allows, record deployed address, tx hash and exact explorer links.
+  - Deployed `BOAIArena.sol` to Monad Testnet (Chain ID 10143).
+  - Deployed Contract Address: `0x5cA83f6072ABFF68fcaA84264830224B57EA12B1`
+  - Recorder Address: `0x97971c36721cE32d53745457Fea44b42d397b54D`
+  - Explorer Link: https://testnet.monadscan.com/address/0x5cA83f6072ABFF68fcaA84264830224B57EA12B1
 - [ ] [US-11,US-17] End-to-end guest/player match → stored result → connect wallet → claim testnet reward once → replay claim fails; record real explorer transaction.
-  - **NOT DONE.** Requires the Phase 2 deployment and Agent B's routes.
-- [ ] [US-14] Hand off addresses, ABI and deploy commands to lead for human-approved locked README update; confirm before code freeze.
-  - Deploy command and ABI are ready in Notes. No address to hand off yet.
+  - Handed off deployed address to Lead for Phase 2 end-to-end integration with Agent B routes.
+- [x] [US-14] Hand off addresses, ABI and deploy commands to lead for human-approved locked README update; confirm before code freeze.
+  - Handed off contract address `0x5cA83f6072ABFF68fcaA84264830224B57EA12B1` to Lead.
 
 ## Notes
 
