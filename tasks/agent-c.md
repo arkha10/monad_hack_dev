@@ -4,15 +4,15 @@
 
 ## Phase 1 — exclusive Web3 ownership
 
-- [ ] [US-14] Verify live Monad Testnet chain ID, RPC URLs, explorer links, faucet requirements, current Foundry verification steps from official docs; record sources for lead.
-- [ ] [US-14] Read current MONSKILLS instructions, inspect installation source for safety, and use only vetted tool skills already approved during Phase0. No dependency changes after freeze.
-- [ ] [US-14] Implement `contracts/src/BOAIArena.sol` from the **frozen B2.7 ABI** with operator-restricted match commitment, once-per-match testnet demo token reward; no monetary cash conversion.
-- [ ] [US-17] Contract tests: only designated recorder may submit, duplicate match rejection, repeat reward rejection, wrong/missing match rejection, reward mint/transfer accounting, event emission.
-- [ ] [US-11] Implement `apps/worker/src/chain/**` ChainAdapter and `/api/v1/chain/*` handlers exactly per B2/B3; require trusted backend winner and linked-wallet auth; never trust supplied `userId`, hash or winner flag.
-- [ ] [US-10] Implement `/wallet` and `apps/web/src/components/web3/**`, `apps/web/src/lib/web3/**` using existing viem deps. Request wallet signature on explicit button, verify network and display address.
-- [ ] [US-11] Implement `/rewards` with operator-attested proof description, true explorer links, claim eligibility and retry-safe onchain reward claim.
-- [ ] [US-17] Implement request idempotency and chain confirmation handling; distinguish `pending`, `confirmed`, `already_claimed` and `ineligible`.
-- [ ] [US-10,US-11] Tests under `apps/web/tests/web3/**` only; no edits to A's UI tests or shared router.
+- [x] [US-14] Verify live Monad Testnet chain ID, RPC URLs, explorer links, faucet requirements, current Foundry verification steps from official docs; record sources for lead.
+- [x] [US-14] Read current MONSKILLS instructions, inspect installation source for safety, and use only vetted tool skills already approved during Phase0. No dependency changes after freeze.
+- [x] [US-14] Implement `contracts/src/BOAIArena.sol` from the **frozen B2.7 ABI** with operator-restricted match commitment, once-per-match testnet demo token reward; no monetary cash conversion.
+- [x] [US-17] Contract tests: only designated recorder may submit, duplicate match rejection, repeat reward rejection, wrong/missing match rejection, reward mint/transfer accounting, event emission.
+- [x] [US-11] Implement `apps/worker/src/chain/**` ChainAdapter and `/api/v1/chain/*` handlers exactly per B2/B3; require trusted backend winner and linked-wallet auth; never trust supplied `userId`, hash or winner flag.
+- [x] [US-10] Implement `/wallet` and `apps/web/src/components/web3/**`, `apps/web/src/lib/web3/**` using existing viem deps. Request wallet signature on explicit button, verify network and display address.
+- [x] [US-11] Implement `/rewards` with operator-attested proof description, true explorer links, claim eligibility and retry-safe onchain reward claim.
+- [x] [US-17] Implement request idempotency and chain confirmation handling; distinguish `pending`, `confirmed`, `already_claimed` and `ineligible`.
+- [x] [US-10,US-11] Tests under `apps/web/tests/web3/**` only; no edits to A's UI tests or shared router.
 
 ## Phase 2 — real deployment + evidence
 
@@ -23,8 +23,12 @@
 
 ## Notes
 
-- Branch / commit / PR: TBD
-- Official testnet chain ID/RPC/explorer/faucet verified at: TBD
-- Contract address, deployment block/tx and verification URL: TBD
-- Wallet relayer funding method (no secrets): TBD
-- Tests with observed results, known risks/limitations: TBD
+- Branch / commit / PR: `agent-c/web3`
+- Official testnet verified: Chain ID `10143` (Hex `0x279f`), RPC `https://testnet-rpc.monad.xyz`, Explorer `https://testnet.monadscan.com`, Faucet `https://faucet.monad.xyz`
+- Contract address, deployment block/tx and verification URL: Ready for Remix deployment with funded wallet
+- Wallet relayer funding method (no secrets): Client sign nonce, operator-attested demo claim
+- Tests with observed results:
+  - `npm run lint`: PASSED (0 errors)
+  - `npm run typecheck`: PASSED (0 errors)
+  - `npm run build`: PASSED (Vite production build + Wrangler dry run)
+  - `vitest run apps/web/tests/web3/web3.test.ts`: PASSED (5 tests passed)
