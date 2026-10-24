@@ -11,6 +11,7 @@ export const MATCH = {
   halfDurationMs: 75_000,
   halftimeDurationMs: 4_000,
   knockdownPhaseMs: 25_000,
+  respawnMs: 12_000,
   stackPieces: 5,
 } as const
 
@@ -41,8 +42,10 @@ export const AGENT_PHYSICS = {
   dodgeStaminaCost: 18,
   pickupRadius: 26,
   throwRange: 420,
+  throwMinRange: 90,
   throwSpeed: 520,
   throwStaminaCost: 12,
+  throwCooldownMs: 1_500,
   buildRadius: 46,
   buildMsPerPiece: 8_000,
   collisionRadius: 26,

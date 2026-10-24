@@ -37,6 +37,10 @@ export interface EngineAgent extends AgentState {
   dodgeUntilTick: number
   dodgeDirX: number
   dodgeDirY: number
+  /** Tick at which this agent was eliminated, or null while it is active. */
+  eliminatedAtTick: number | null
+  /** Tick before which this agent may not throw again. */
+  throwReadyTick: number
 }
 
 export interface GameState {
@@ -110,6 +114,8 @@ function buildSide(side: Side, behaviors: Record<AgentSlot, Behavior>, role: Sid
       dodgeUntilTick: 0,
       dodgeDirX: 0,
       dodgeDirY: 0,
+      eliminatedAtTick: null,
+      throwReadyTick: 0,
     } satisfies EngineAgent
   }).map(agent => ({ ...agent, currentAction: (role === 'REBUILDERS' ? 'MOVE_TO' : 'PICKUP_BALL') as AgentAction }))
 }
@@ -201,6 +207,22 @@ function agentKey(agent: EngineAgent): `${Side}:${AgentSlot}` {
   return slotKey(agent.side, agent.slot)
 }
 
+/**
+ * Shortest distance from a point to the segment a-b. The ball moves up to 52px per tick
+ * while collision radii are 26px, so a point-in-circle test at the new position tunnels
+ * through agents and the stack. Sweeping the travelled segment is what makes hits land.
+ */
+function pointToSegmentDistance(point: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lengthSquared = dx * dx + dy * dy
+  if (lengthSquared === 0) return Math.hypot(point.x - a.x, point.y - a.y)
+  const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared))
+  const closestX = a.x + t * dx
+  const closestY = a.y + t * dy
+  return Math.hypot(point.x - closestX, point.y - closestY)
+}
+
 function nearestOpponent(agent: EngineAgent, agents: EngineAgent[]): EngineAgent | null {
   let best: EngineAgent | null = null
   let bestDistance = Number.POSITIVE_INFINITY
@@ -222,6 +244,13 @@ function behaviorTarget(agent: EngineAgent, state: GameState, rng: Rng): { x: nu
   const ballLoose = state.ball.holder === null
 
   if (role === 'REBUILDERS') {
+    // Whoever holds the ball must be able to throw it, regardless of role. Without this the
+    // ball is dead for the rest of the half as soon as a rebuilder touches it, because every
+    // branch below only ever returns BUILD/MOVE_TO and tryThrow never sees a THROW action.
+    if (state.ball.holder === agentKey(agent)) {
+      const opponent = nearestOpponent(agent, state.agents)
+      if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
+    }
     if (coach === 'DISTRACT') {
       const angle = rng.angleRadians()
       return { x: STACK_CENTER.x + Math.cos(angle) * 220, y: STACK_CENTER.y + Math.sin(angle) * 140, action: 'DISTRACT' }
@@ -265,6 +294,10 @@ function behaviorTarget(agent: EngineAgent, state: GameState, rng: Rng): { x: nu
   }
   const holderIsSelf = state.ball.holder === agentKey(agent)
   if (holderIsSelf) {
+    // A hunter holding the ball should knock the stack down rather than chase a person.
+    if (!state.stack.knockedDown && state.stack.completed > 0) {
+      return { x: state.stack.position.x, y: state.stack.position.y, action: 'THROW' }
+    }
     const opponent = nearestOpponent(agent, state.agents)
     if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
     return { x: STACK_CENTER.x, y: STACK_CENTER.y, action: 'MOVE_TO' }
@@ -284,6 +317,7 @@ function moveAgent(agent: EngineAgent, dtSeconds: number, rng: Rng): void {
   const dy = agent.targetY - agent.position.y
   const distance = Math.hypot(dx, dy)
   const wantsDodge = agent.currentAction === 'DODGE'
+  const wantsThrow = agent.currentAction === 'THROW'
   const wantsSprint = agent.currentAction === 'SPRINT' || agent.currentAction === 'DISTRACT'
 
   let speed: number = AGENT_PHYSICS.walkSpeed
@@ -309,7 +343,9 @@ function moveAgent(agent: EngineAgent, dtSeconds: number, rng: Rng): void {
     agent.position.y + (dy / distance) * step + jitterY,
   )
   agent.position = next
-  if (!wantsDodge) agent.currentAction = speed === AGENT_PHYSICS.sprintSpeed ? 'SPRINT' : 'MOVE_TO'
+  // Preserve THROW: moveAgent runs before tryThrow, so overwriting it here would make the
+  // throw branch unreachable and the stack could never be knocked down.
+  if (!wantsDodge && !wantsThrow) agent.currentAction = speed === AGENT_PHYSICS.sprintSpeed ? 'SPRINT' : 'MOVE_TO'
 }
 
 function resolveBall(state: GameState, dtSeconds: number, events: MatchEvent[]): void {
@@ -333,25 +369,15 @@ function resolveBall(state: GameState, dtSeconds: number, events: MatchEvent[]):
 
   const nextX = ball.position.x + ball.velocity.x * dtSeconds
   const nextY = ball.position.y + ball.velocity.y * dtSeconds
+  const from = { x: ball.position.x, y: ball.position.y }
   ball.position = { x: nextX, y: nextY }
 
-  for (const agent of state.agents) {
-    if (!agent.active) continue
-    if (ball.thrower === agentKey(agent)) continue
-    const distance = Math.hypot(agent.position.x - ball.position.x, agent.position.y - ball.position.y)
-    if (distance <= AGENT_PHYSICS.collisionRadius) {
-      agent.active = false
-      agent.currentAction = 'WAIT'
-      scoreFor(state, agent.side === 'red' ? 'blue' : 'red').eliminations += 1
-      emit(state, events, 'AGENT_ELIMINATED', agentKey(agent), { hitBy: ball.thrower ?? 'unknown' })
-      ball.inFlight = false
-      ball.velocity = { x: 0, y: 0 }
-      ball.thrower = null
-      return
-    }
-  }
-
-  const stackDistance = Math.hypot(ball.position.x - state.stack.position.x, ball.position.y - state.stack.position.y)
+  // A point sample at the new position misses fast targets: the ball travels 52px per tick
+  // (throwSpeed 520 * 0.1s) while collision radii are 26px, so it would tunnel through both
+  // agents and the stack. Test the whole segment travelled this tick instead.
+  // The stack is checked before the agents: a ball thrown at a standing stack is aimed at the
+  // objective, and rebuilders crowding the stack would otherwise absorb it every time.
+  const stackDistance = pointToSegmentDistance(state.stack.position, from, ball.position)
   if (stackDistance <= AGENT_PHYSICS.collisionRadius + 12) {
     if (!state.stack.knockedDown) {
       state.stack.knockedDown = true
@@ -362,6 +388,27 @@ function resolveBall(state: GameState, dtSeconds: number, events: MatchEvent[]):
     ball.velocity = { x: 0, y: 0 }
     ball.thrower = null
     return
+  }
+
+  for (const agent of state.agents) {
+    if (!agent.active) continue
+    if (ball.thrower === agentKey(agent)) continue
+    const throwerSide = ball.thrower?.split(':')[0] ?? null
+    // Teammates are not targets. A ball thrown at the stack passes over its own rebuilders,
+    // and friendly fire was crediting the opposing side with the elimination.
+    if (throwerSide === agent.side) continue
+    const distance = pointToSegmentDistance(agent.position, from, ball.position)
+    if (distance <= AGENT_PHYSICS.collisionRadius) {
+      agent.active = false
+      agent.eliminatedAtTick = state.tick
+      agent.currentAction = 'WAIT'
+      scoreFor(state, agent.side === 'red' ? 'blue' : 'red').eliminations += 1
+      emit(state, events, 'AGENT_ELIMINATED', agentKey(agent), { hitBy: ball.thrower ?? 'unknown' })
+      ball.inFlight = false
+      ball.velocity = { x: 0, y: 0 }
+      ball.thrower = null
+      return
+    }
   }
 
   if (ball.position.x < 0 || ball.position.x > ARENA.width || ball.position.y < 0 || ball.position.y > ARENA.height) {
@@ -377,10 +424,23 @@ function tryThrow(state: GameState, agent: EngineAgent, rng: Rng, events: MatchE
   if (ball.holder !== agentKey(agent)) return false
   if (agent.stamina < AGENT_PHYSICS.throwStaminaCost) return false
   if (agent.currentAction !== 'THROW') return false
-  const target = nearestOpponent(agent, state.agents)?.position
+  // Without a cooldown a holder standing next to an opponent re-throws every tick, which
+  // produced ~66 eliminations per match and left the objective unplayable.
+  if (state.tick < agent.throwReadyTick) return false
+  const stackStanding = !state.stack.knockedDown && state.stack.completed > 0
+  const role = roleFor(state, agent.side)
+  // Hunters exist to knock the stack down. Aiming only at opponents meant the stack was
+  // never touched, because rebuilders standing at the stack absorbed every ball first.
+  // The stack sits at the centre both teams converge on, so a throw at it is a real throw
+  // even from close range; a throw at a person is not, which is what throwMinRange guards.
+  const aimAtStack = role === 'HUNTERS' && stackStanding
+  const target = aimAtStack ? state.stack.position : nearestOpponent(agent, state.agents)?.position
   if (!target) return false
   const distance = Math.hypot(target.x - agent.position.x, target.y - agent.position.y)
   if (distance > AGENT_PHYSICS.throwRange) return false
+  // A point-blank throw at a person is not a throw. Both teams converge on the stack, so
+  // without a minimum distance every tick was an unmissable hit at ~62 eliminations per match.
+  if (!aimAtStack && distance < AGENT_PHYSICS.throwMinRange) return false
 
   const aimError = rng.range(-0.09, 0.09)
   const angle = Math.atan2(target.y - agent.position.y, target.x - agent.position.x) + aimError
@@ -393,6 +453,7 @@ function tryThrow(state: GameState, agent: EngineAgent, rng: Rng, events: MatchE
     y: Math.sin(angle) * AGENT_PHYSICS.throwSpeed,
   }
   agent.stamina = Math.max(0, agent.stamina - AGENT_PHYSICS.throwStaminaCost)
+  agent.throwReadyTick = state.tick + Math.ceil(AGENT_PHYSICS.throwCooldownMs / MATCH.tickMs)
   emit(state, events, 'BALL_THROW', agentKey(agent), { targetX: Math.round(target.x), targetY: Math.round(target.y) })
   return true
 }
@@ -424,13 +485,14 @@ function resolveBuilding(state: GameState, dtMs: number, events: MatchEvent[]): 
   if (stack.completed >= stack.total) {
     const score = scoreFor(state, side)
     score.objectiveComplete = true
+    const completedAtMs = Math.round(state.halfElapsedMs)
     // The stack can be knocked down and rebuilt inside one half. The tie-break in
     // authoritativeWinner compares how fast the objective was reached, so the first
-    // completion is the one that counts; a later rebuild must not overwrite it.
-    if (score.completionMs === null) {
-      score.completionMs = Math.round(state.halfElapsedMs)
-      emit(state, events, 'STACK_COMPLETE', null, { side, completionMs: score.completionMs })
-    }
+    // completion is the one that counts; a later rebuild must not overwrite it. The event
+    // still fires on every completion and carries that completion's real time, because a
+    // rebuild is a visible game moment rather than a repeat of the first one.
+    if (score.completionMs === null) score.completionMs = completedAtMs
+    emit(state, events, 'STACK_COMPLETE', null, { side, completionMs: completedAtMs })
   }
 }
 
@@ -516,6 +578,23 @@ export function advance(state: GameState, dtMs: number): TickOutput {
 
   const desiredPhase: MatchPhase = state.halfElapsedMs < MATCH.knockdownPhaseMs ? 'KNOCKDOWN' : 'REBUILD'
   if (state.phase !== desiredPhase) transitionPhase(state, desiredPhase, events)
+
+  // Elimination is not permanent: a knocked-out agent returns after MATCH.respawnMs. Without
+  // this, five accurate throws end the half with nobody left to build, so the objective
+  // becomes unreachable and every match finishes without a stack.
+  for (const agent of state.agents) {
+    if (agent.active || agent.eliminatedAtTick === null) continue
+    const eliminatedForMs = (state.tick - agent.eliminatedAtTick) * MATCH.tickMs
+    if (eliminatedForMs < MATCH.respawnMs) continue
+    const spawn = SIDE_SPAWN[agent.side]
+    const offset = SLOT_OFFSETS[agent.slot]
+    agent.position = clampToArena(spawn.x + offset.x, spawn.y + offset.y)
+    agent.stamina = AGENT_PHYSICS.maxStamina
+    agent.active = true
+    agent.eliminatedAtTick = null
+    agent.currentAction = 'MOVE_TO'
+    emit(state, events, 'AGENT_RESPAWN', agentKey(agent), { x: Math.round(agent.position.x), y: Math.round(agent.position.y) })
+  }
 
   for (const agent of state.agents) {
     if (!agent.active) continue
