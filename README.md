@@ -16,7 +16,7 @@ The current app is a scaffold. Backend gameplay, real authentication, WebSocket 
 - Cloudflare and Supabase accounts are not configured yet
 - Monad Testnet verified at chain `10143`, RPC `https://testnet-rpc.monad.xyz`, explorer `https://testnet.monadscan.com`
 
-`PHASE_0_LOCKED` will be added here only after this branch is reviewed and merged to `origin/main` by the human approver.
+`PHASE_0_LOCKED: 5b0d41be10674acd97e9120588ff04c28ea424d7` is now present on `origin/main`. Agent B and Agent C may begin Phase1 on their own branches.
 
 **This folder contains planning and agent-instruction documents only. No application scaffold, app code, or deployment was created.**
 
