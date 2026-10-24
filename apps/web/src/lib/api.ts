@@ -3,8 +3,7 @@ import type { Difficulty, TeamId, CoachCommand } from "@boai/shared/types";
 import { getSession } from "./auth";
 
 export const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://localhost:8787";
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
 async function request<T>(
   path: string,

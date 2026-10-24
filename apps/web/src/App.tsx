@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
-import { parseBehavior } from "@boai/shared/helpers";
+import type { MatchResult, MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
+import { buildExplorerTxUrl, parseBehavior } from "@boai/shared/helpers";
 import { SEED } from "@boai/shared/seed";
 import { API_BASE_URL, api } from "./lib/api";
-import { getSession, googleLogin, guestLogin, signOut } from "./lib/auth";
+import { getSession, googleLogin, guestLogin, signOut, supabase } from "./lib/auth";
+import { WalletPage } from "./routes/Wallet";
+import { RewardsPage } from "./routes/Rewards";
 
 const links = [
   ["/team", "Tim"],
@@ -13,7 +15,20 @@ const links = [
   ["/leaderboard", "Peringkat"],
   ["/shop", "Toko"],
   ["/profile", "Profil"],
+  ["/wallet", "Wallet"],
+  ["/rewards", "Hadiah"],
 ] as const;
+
+const navGlyphs: Record<(typeof links)[number][0], string> = {
+  "/team": "◆",
+  "/practice": "↯",
+  "/queue": "◎",
+  "/leaderboard": "✦",
+  "/shop": "▣",
+  "/profile": "◉",
+  "/wallet": "◇",
+  "/rewards": "✧",
+};
 
 function Shell({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(false);
@@ -33,6 +48,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <nav>
           {links.map(([path, label]) => (
             <Link key={path} to={path}>
+              <span className="nav-glyph" aria-hidden="true">{navGlyphs[path]}</span>
               {label}
             </Link>
           ))}
@@ -59,42 +75,51 @@ function Notice({
 }
 
 function Home() {
+  const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const login = async (kind: "guest" | "google") => {
     try {
       if (kind === "guest") await guestLogin();
       else await googleLogin();
-      setMessage(
-        kind === "guest"
-          ? "Guest siap. Lanjutkan ke editor tim."
-          : "Mengarahkan ke Google...",
-      );
+      if (kind === "guest") {
+        navigate("/team");
+        return;
+      }
+      setMessage("Mengarahkan ke Google...");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Login gagal");
     }
   };
   return (
-    <main className="hero">
+    <>
+      <main className="hero">
       <section>
         <p className="eyebrow">
-          INDONESIAN TRADITIONAL GAME · AGENT SIMULATION
+          PERMAINAN RAKYAT SUNDA · AGENT SIMULATION
         </p>
         <h1>
-          Susun strategi.
+          Jatuhkan genteng.
           <br />
-          <em>Jatuhkan menara.</em>
+          <em>Bangun kembali.</em>
         </h1>
         <p className="lede">
-          Arena Boi-boian 5 lawan 5 dengan lima agen deterministik yang
-          mengikuti prompt dan arahan coach Anda.
+          BOAI adalah arena Boi-boian online 5 lawan 5. Lima agent deterministik
+          membaca prompt Anda, mengejar bola, menjaga tumpukan, dan membangun
+          kembali menara genteng.
         </p>
         <div className="hero-actions">
           <button onClick={() => login("guest")}>
             Masuk sebagai Guest <span>↗</span>
           </button>
-          <button className="secondary" onClick={() => login("google")}>
-            Masuk dengan Google
-          </button>
+          {supabase ? (
+            <button className="secondary" onClick={() => login("google")}>
+              Masuk dengan Google
+            </button>
+          ) : (
+            <button className="secondary" disabled>
+              Google belum dikonfigurasi
+            </button>
+          )}
         </div>
         {message && <Notice>{message}</Notice>}
         <p className="microcopy">
@@ -143,7 +168,23 @@ function Home() {
           </span>
         </div>
       </section>
-    </main>
+      </main>
+      <section className="content home-rules">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">BOI-BOIAN · ADAPTASI DIGITAL</p>
+          <h2>Dua tim. Satu tumpukan.</h2>
+          <p className="muted">Terinspirasi permainan rakyat Jawa Barat. Aturan BOAI adalah adaptasi produk, bukan klaim satu-satunya versi historis.</p>
+        </div>
+        <span className="badge">TESTNET · TANPA NILAI UANG</span>
+      </div>
+      <div className="home-rule-grid">
+        <article className="panel rule-card"><img src="/art/boai-stack-states.png" alt="Enam keadaan tumpukan genteng Boi-boian" /><h3>Robohkan</h3><p>Lempar bola ke tumpukan genteng dari jarak yang disepakati.</p></article>
+        <article className="panel rule-card"><img src="/art/boai-vfx.png" alt="Efek pixel bola kain saat dilempar" /><h3>Hindari</h3><p>Tim lawan mengejar dan melempar bola sementara tim Anda bergerak.</p></article>
+        <article className="panel rule-card"><img src="/art/boai-badges.png" alt="Badge tile, bola, bambu, dan teamwork BOAI" /><h3>Bangun</h3><p>Susun kembali menara. Skor tercatat setelah server menyelesaikan ronde.</p></article>
+      </div>
+      </section>
+    </>
   );
 }
 
@@ -413,7 +454,7 @@ function MatchPage() {
         if (cancelled) return;
         setSnapshot(initial.data);
         const ticket = await api.createMatchSocketTicket(matchId);
-        const apiUrl = new URL(API_BASE_URL);
+        const apiUrl = new URL(API_BASE_URL || window.location.origin);
         const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
         socket = new WebSocket(
           `${protocol}//${apiUrl.host}/ws/v1/matches/${matchId}?ticket=${encodeURIComponent(ticket.data.ticket)}`,
@@ -519,8 +560,8 @@ function MatchPage() {
                         left: `${agent.position.x * 100}%`,
                         top: `${agent.position.y * 100}%`,
                         borderColor:
-                          agent.side === "red" ? "#ef916f" : "#b3f77f",
-                        color: agent.side === "red" ? "#ef916f" : "#b3f77f",
+                          agent.side === "red" ? "#d86122" : "#e9b94e",
+                        color: agent.side === "red" ? "#d86122" : "#e9b94e",
                       }}
                     >
                       {agent.slot}
@@ -573,10 +614,14 @@ function MatchPage() {
 function ResultsPage() {
   const { matchId = "unknown" } = useParams();
   const [status, setStatus] = useState("Memuat hasil");
+  const [result, setResult] = useState<MatchResult | null>(null);
   useEffect(() => {
     api
       .getResult(matchId)
-      .then(() => setStatus("Hasil terkonfirmasi server"))
+      .then((response) => {
+        setResult(response.data);
+        setStatus("Hasil terkonfirmasi server");
+      })
       .catch((error) =>
         setStatus(
           error instanceof Error ? error.message : "Hasil belum tersedia",
@@ -594,24 +639,33 @@ function ResultsPage() {
           alt="Menara Boi-boian runtuh"
         />
         <span className="result-mark">◆</span>
-        <h2>Menunggu finalisasi</h2>
+        <h2>
+          {result === null
+            ? "Menunggu finalisasi"
+            : result.winnerSide === "draw"
+              ? "Pertandingan seri"
+              : `Tim ${result.winnerSide === "red" ? "merah" : "biru"} menang`}
+        </h2>
         <p>{status}</p>
-        <div className="result-grid">
-          <span>
-            <b>RED</b> —
-          </span>
-          <span>
-            <b>BLUE</b> —
-          </span>
-          <span>
-            <b>HALVES</b> 2
-          </span>
-          <span>
-            <b>REPLAY</b> server digest
-          </span>
-        </div>
+        {result !== null ? (
+          <div className="result-grid">
+            <span><b>MERAH</b> {result.scores.red.buildCount} menara, {result.scores.red.eliminations} eliminasi</span>
+            <span><b>BIRU</b> {result.scores.blue.buildCount} menara, {result.scores.blue.eliminations} eliminasi</span>
+            <span><b>REPLAY</b> {result.replayHash.slice(0, 12)}…</span>
+            <span><b>RULESET</b> {result.rulesetHash.slice(0, 12)}…</span>
+            <span><b>FINAL</b> {result.finalizedAt}</span>
+            <span>
+              <b>MONAD</b>{" "}
+              {result.chainTxHash ? (
+                <a href={buildExplorerTxUrl(result.chainTxHash)} target="_blank" rel="noreferrer">
+                  Lihat transaksi ↗
+                </a>
+              ) : "Belum tercatat di chain"}
+            </span>
+          </div>
+        ) : null}
       </div>
-      <Link className="button-link" to="/rewards">
+      <Link className="button-link" to={`/rewards?matchId=${encodeURIComponent(matchId)}`}>
         Lihat opsi hadiah testnet ↗
       </Link>
     </main>
@@ -722,7 +776,11 @@ function ProfilePage() {
       <div className="panel profile-card">
         <span className="avatar">G</span>
         <h2>Guest Player</h2>
-        <p>Identitas sesi dikelola oleh Supabase Auth saat dikonfigurasi.</p>
+        <p>
+          {supabase
+            ? "Identitas sesi dikelola oleh Supabase Auth."
+            : "Sesi guest memakai cookie bertanda tangan server. Login Google belum dikonfigurasi."}
+        </p>
         <button className="secondary" onClick={logout}>
           Keluar
         </button>
@@ -767,14 +825,8 @@ export function App() {
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route
-          path="/wallet"
-          element={<SimplePage title="Wallet testnet" eyebrow="WEB3" />}
-        />
-        <Route
-          path="/rewards"
-          element={<SimplePage title="Hadiah testnet" eyebrow="WEB3" />}
-        />
+        <Route path="/wallet" element={<WalletPage />} />
+        <Route path="/rewards" element={<RewardsPage />} />
       </Routes>
     </Shell>
   );

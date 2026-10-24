@@ -35,11 +35,16 @@
 
 ## Notes
 
-- Branch / commit / PR: main, lead integration commit pending
+- Branch / commit / PR: `integration/trial` at `6a65685`, pushed to origin. Draft PR: https://github.com/arkha10/monad_hack_dev/pull/4.
 - Phase0 locked SHA: 5b0d41be10674acd97e9120588ff04c28ea424d7, merged to origin/main by commit a29d453
-- Frontend work completed in this pass: team.id is read from GET /api/v1/team before practice and queue, missing Supabase configuration now fails honestly, MatchPage consumes MatchSnapshot and opens the frozen WebSocket ticket endpoint, and route ownership is recorded in apps/web/src/router.tsx.
-- Live frontend URL: https://boai-arena-web.pages.dev
-- Backend URL: not deployed. apps/worker/src/index.ts still returns HTTP 501 for B and C routes.
-- Tests executed and observed outputs: npm run lint passed, npm run typecheck passed, npm run build passed, npm test passed with 3 tests, and all 12 browser history routes returned HTTP 200 from the Vite smoke server.
-- Known blockers: Agent B backend branch is not present on origin. Agent C has not supplied a deployed contract or real transaction evidence. Supabase OAuth and guest auth are not configured in the deployed environment. The C-owned Wallet and Rewards route components are not merged into the main router.
-- Handoff: BLOCKED. Owner: Agent B for apps/worker/src/index.ts and authoritative match APIs. Owner: Agent C for deployed Monad contract, secure chain adapter, and Wallet/Rewards route handoff.
+- Frontend and backend are deployed together as Worker static assets and same-origin API at https://boai-api.arkha10-boai.workers.dev. Latest deployed Worker version: `4b7635ef-9a97-474b-a665-2af53cba8329`. `/health` returns HTTP 200 and the Phase 2 ruleset.
+- Agent C Wallet and Rewards pages are mounted at `/wallet` and `/rewards`. The BOAI Sundanese 2D pixel art redesign is deployed. The Google button is disabled until Supabase frontend configuration is provisioned. Guest play uses the signed HttpOnly Secure cookie session.
+- Worker production configuration includes the Monad testnet RPC, chain ID 10143, contract address, internal secret, and commitment salt. `CHAIN_RELAYER_PRIVATE_KEY` is not provisioned.
+- Local QA: `npm run lint` passed, `npm run typecheck` passed, `npm run build` passed, `npm test` passed with 13 files and 167 tests, `forge test --root contracts --network monad` passed with 12 tests, and `git diff --check` passed.
+- Browser QA on the HTTPS deployment: homepage and all images loaded, guest sign-in and team save passed, `/wallet` and `/rewards` rendered, guest sign-out returned 200 and cleared its Secure cookie. The post-sign-out team request returned the expected 401. No uncaught page errors were observed.
+- PvP smoke used two isolated Chrome contexts on one host. Both players joined the zero-credit queue, reached the same match, opened WSS, received authoritative snapshots, and the coach command was accepted. A second remote practice match ran to `FINISHED`, returned winner, scores, replay hash, and ruleset hash. The result currently has no chain transaction hash.
+- A live full-match result read returned HTTP 200. Reward eligibility returned HTTP 200 and `ineligible` for an unrelated guest account without a linked wallet. Queue join, waiting status, and leave also passed.
+- Live contract evidence: address `0x5cA83f6072ABFF68fcaA84264830224B57EA12B1`, chain ID 10143, 2,926 bytes of deployed code, deployment transaction `0xf0480d5c5d9d784693719910a50a06d4358ee508fab222838951dad4e4b4d11a`, block 73,729,260, receipt status 1. [MonadScan transaction](https://testnet.monadscan.com/tx/0xf0480d5c5d9d784693719910a50a06d4358ee508fab222838951dad4e4b4d11a).
+- Chain write and claim remain blocked. The contract recorder is `0x97971c36721cE32d53745457Fea44b42d397b54D`. A human must securely provision an authorized relayer secret or grant `RECORDER_ROLE` to a funded relayer and configure that secret in Cloudflare. Do not send private keys in chat.
+- Google OAuth remains unavailable until the Supabase project URL, JWT settings, frontend publishable key, and Google provider are configured. Guest gameplay is live. The browser QA did not use an injected wallet or claim a reward. Testing on a separate physical device remains outstanding.
+- Handoff: BLOCKED on the human owner provisioning a Monad testnet relayer with `RECORDER_ROLE` and configuring Supabase if Google login is required. The live Worker and guest gameplay are ready for review at https://boai-api.arkha10-boai.workers.dev.

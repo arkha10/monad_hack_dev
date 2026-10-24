@@ -31,7 +31,16 @@
       ]
     }
   ],
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*", "/health"]
+  },
   "vars": {
-    "WEB_ORIGIN": "http://localhost:5173"
+    "WEB_ORIGIN": "https://boai-api.arkha10-boai.workers.dev",
+    "BOAI_ENV": "production",
+    "MONAD_RPC_URL": "https://testnet-rpc.monad.xyz",
+    "MONAD_CHAIN_ID": "10143",
+    "BOAI_CONTRACT_ADDRESS": "0x5cA83f6072ABFF68fcaA84264830224B57EA12B1"
   }
 }
