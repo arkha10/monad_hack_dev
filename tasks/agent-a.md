@@ -35,7 +35,7 @@
 
 ## Notes
 
-- Branch / base commit: `integration/trial` at `5c404cd0e50b938070fba405dc2a79b02141ad35` before this QA and deployment pass. Current changes are pending commit.
+- Branch / commit / PR: `integration/trial` at `6a65685`, pushed to origin. Draft PR: https://github.com/arkha10/monad_hack_dev/pull/4.
 - Phase0 locked SHA: 5b0d41be10674acd97e9120588ff04c28ea424d7, merged to origin/main by commit a29d453
 - Frontend and backend are deployed together as Worker static assets and same-origin API at https://boai-api.arkha10-boai.workers.dev. Latest deployed Worker version: `4b7635ef-9a97-474b-a665-2af53cba8329`. `/health` returns HTTP 200 and the Phase 2 ruleset.
 - Agent C Wallet and Rewards pages are mounted at `/wallet` and `/rewards`. The BOAI Sundanese 2D pixel art redesign is deployed. The Google button is disabled until Supabase frontend configuration is provisioned. Guest play uses the signed HttpOnly Secure cookie session.
