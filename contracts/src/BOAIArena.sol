@@ -10,7 +10,10 @@ contract BOAIArena {
     event MatchRecorded(bytes32 indexed matchId, bytes32 replayHash, bytes32 resultHash, bytes32 rulesetHash, bytes32 winnerCommitment);
     event DemoRewardAwarded(bytes32 indexed matchId, address indexed recipient, uint256 amount);
 
-    constructor(address recorder_) { recorder = recorder_; }
+    constructor(address recorder_) {
+        require(recorder_ != address(0), 'BOAI: invalid recorder');
+        recorder = recorder_;
+    }
     modifier onlyRecorder() { require(msg.sender == recorder, 'BOAI: recorder only'); _; }
 
     function recordMatch(bytes32 matchId, bytes32 replayHash, bytes32 resultHash, bytes32 rulesetHash, bytes32 winnerCommitment) external onlyRecorder {
@@ -22,6 +25,7 @@ contract BOAIArena {
     function awardDemoReward(bytes32 matchId, address recipient) external onlyRecorder {
         require(recorded[matchId], 'BOAI: match missing');
         require(!claimed[matchId], 'BOAI: reward claimed');
+        require(recipient != address(0), 'BOAI: invalid recipient');
         claimed[matchId] = true;
         balances[recipient] += 1 ether;
         emit DemoRewardAwarded(matchId, recipient, 1 ether);

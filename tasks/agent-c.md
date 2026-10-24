@@ -31,4 +31,5 @@
   - `npm run lint`: PASSED (0 errors)
   - `npm run typecheck`: PASSED (0 errors)
   - `npm run build`: PASSED (Vite production build + Wrangler dry run)
-  - `vitest run apps/web/tests/web3/web3.test.ts`: PASSED (5 tests passed)
+  - `npm test`: PASSED (vitest tests passed)
+  - `forge test --root contracts`: PASSED (8 tests passed)
