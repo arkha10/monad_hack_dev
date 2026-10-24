@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AgentAction,
   AgentSlot,
   AgentState,
@@ -237,6 +237,21 @@ function nearestOpponent(agent: EngineAgent, agents: EngineAgent[]): EngineAgent
   return best
 }
 
+/**
+ * A holder closer than `throwMinRange` to a person cannot legally throw at them. Standing
+ * still holds the ball forever, which is exactly what froze the live match: the holder was
+ * inside 90px of its target on 1500 of 1515 held ticks, because both teams converge on the
+ * stack. Backing off to throwing range turns a dead ball into a real throw.
+ */
+function backOffToThrowRange(agent: EngineAgent, target: { x: number; y: number }): { x: number; y: number } {
+  const desired = AGENT_PHYSICS.throwMinRange + 40
+  const dx = agent.position.x - target.x
+  const dy = agent.position.y - target.y
+  const distance = Math.hypot(dx, dy)
+  if (distance < 1) return clampToArena(target.x + desired, target.y)
+  return clampToArena(target.x + (dx / distance) * desired, target.y + (dy / distance) * desired)
+}
+
 function behaviorTarget(agent: EngineAgent, state: GameState, rng: Rng): { x: number; y: number; action: AgentAction } {
   const role = roleFor(state, agent.side)
   const coachActive = state.coachSide === agent.side && state.tick < state.coachExpiresTick
@@ -249,7 +264,14 @@ function behaviorTarget(agent: EngineAgent, state: GameState, rng: Rng): { x: nu
     // branch below only ever returns BUILD/MOVE_TO and tryThrow never sees a THROW action.
     if (state.ball.holder === agentKey(agent)) {
       const opponent = nearestOpponent(agent, state.agents)
-      if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
+      if (opponent) {
+        const distance = Math.hypot(opponent.position.x - agent.position.x, opponent.position.y - agent.position.y)
+        if (distance < AGENT_PHYSICS.throwMinRange) {
+          const retreat = backOffToThrowRange(agent, opponent.position)
+          return { x: retreat.x, y: retreat.y, action: 'MOVE_TO' }
+        }
+        return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
+      }
     }
     if (coach === 'DISTRACT') {
       const angle = rng.angleRadians()
@@ -299,7 +321,14 @@ function behaviorTarget(agent: EngineAgent, state: GameState, rng: Rng): { x: nu
       return { x: state.stack.position.x, y: state.stack.position.y, action: 'THROW' }
     }
     const opponent = nearestOpponent(agent, state.agents)
-    if (opponent) return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
+    if (opponent) {
+      const distance = Math.hypot(opponent.position.x - agent.position.x, opponent.position.y - agent.position.y)
+      if (distance < AGENT_PHYSICS.throwMinRange) {
+        const retreat = backOffToThrowRange(agent, opponent.position)
+        return { x: retreat.x, y: retreat.y, action: 'MOVE_TO' }
+      }
+      return { x: opponent.position.x, y: opponent.position.y, action: 'THROW' }
+    }
     return { x: STACK_CENTER.x, y: STACK_CENTER.y, action: 'MOVE_TO' }
   }
   const holderIsAlly = state.ball.holder?.startsWith(`${agent.side}:`) ?? false
@@ -377,8 +406,13 @@ function resolveBall(state: GameState, dtSeconds: number, events: MatchEvent[]):
   // agents and the stack. Test the whole segment travelled this tick instead.
   // The stack is checked before the agents: a ball thrown at a standing stack is aimed at the
   // objective, and rebuilders crowding the stack would otherwise absorb it every time.
+  // Only a hunter can knock it down. The stack belongs to whoever is rebuilding this half, so
+  // a rebuilder's throw crossing it was destroying its own objective (observed as
+  // `STACK_KNOCKED by red:p2` while red was the rebuilding side).
+  const throwerSide = ball.thrower?.split(':')[0] ?? null
+  const throwerIsHunter = throwerSide !== null && roleFor(state, throwerSide as Side) === 'HUNTERS'
   const stackDistance = pointToSegmentDistance(state.stack.position, from, ball.position)
-  if (stackDistance <= AGENT_PHYSICS.collisionRadius + 12) {
+  if (throwerIsHunter && stackDistance <= AGENT_PHYSICS.collisionRadius + 12) {
     if (!state.stack.knockedDown) {
       state.stack.knockedDown = true
       state.stack.completed = 0
@@ -393,7 +427,6 @@ function resolveBall(state: GameState, dtSeconds: number, events: MatchEvent[]):
   for (const agent of state.agents) {
     if (!agent.active) continue
     if (ball.thrower === agentKey(agent)) continue
-    const throwerSide = ball.thrower?.split(':')[0] ?? null
     // Teammates are not targets. A ball thrown at the stack passes over its own rebuilders,
     // and friendly fire was crediting the opposing side with the elimination.
     if (throwerSide === agent.side) continue
@@ -531,6 +564,11 @@ function resetForHalf(state: GameState, half: 1 | 2): void {
     agent.currentAction = roleFor(state, agent.side) === 'REBUILDERS' ? 'MOVE_TO' : 'PICKUP_BALL'
     agent.buildProgressMs = 0
     agent.dodgeUntilTick = 0
+    // Elimination state must not leak across halves. An agent knocked out in half 1 was
+    // staying inactive for all of half 2, which made half 2 systematically easier for the
+    // side that had not been eliminated: the hunters could not contest the stack at all.
+    agent.eliminatedAtTick = null
+    agent.throwReadyTick = 0
   }
   state.buildProgressMs = 0
 }
