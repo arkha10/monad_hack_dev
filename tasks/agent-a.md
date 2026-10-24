@@ -35,12 +35,13 @@
 
 ## Notes
 
-- Branch / commit / PR: `integration/trial` at `b72ad4301847832f34573580bd0c388c766339fa`, not pushed yet
+- Branch / commit / PR: `integration/trial`, code integration commit `fb3093bdeea76aeccdb0918f27d05bcba9f0ace3`, pushed to origin
 - Phase0 locked SHA: 5b0d41be10674acd97e9120588ff04c28ea424d7, merged to origin/main by commit a29d453
 - Frontend integration: Agent C Wallet and Rewards pages are mounted at `/wallet` and `/rewards`, with both routes discoverable in the navigation. BOAI Sundanese 2D pixel art redesign is included.
 - Backend integration: Agent C chain handler is mounted at `/api/v1/chain/*`, using the Agent B authoritative winner and linked wallet lookups. Chain responses receive the configured CORS headers. `/health` reports Phase 2.
 - Live frontend URL: https://boai-arena-web.pages.dev
 - Backend URL: no production URL is claimed. Local Worker smoke returned Phase 2 health, unauthenticated chain eligibility returned 401, and guest-authenticated eligibility returned the honest `CHAIN_NOT_CONFIGURED` response because local chain environment values are not provisioned.
 - Tests executed on the integrated branch: `npm run lint` passed, `npm run typecheck` passed, `npm run build` passed, and `npm test` passed with 13 files and 166 tests. `forge test --root contracts --network monad` could not run because Foundry is not installed on this machine. The Monad Testnet RPC returned chain ID 10143 and 2,926 bytes of contract code at the recorded address.
-- Known blockers: no production Worker URL or complete live claim flow is verified. Agent C's task file still contains contradictory deployment notes and does not provide the deployment transaction hash or block number. The repo's local build does not provision Worker secrets or contract address. Two-browser production WebSocket acceptance is not complete.
+- Live contract evidence: address `0x5cA83f6072ABFF68fcaA84264830224B57EA12B1`, chain ID 10143, deployment transaction `0xf0480d5c5d9d784693719910a50a06d4358ee508fab222838951dad4e4b4d11a`, block 73,729,260, receipt status 1. [MonadScan transaction](https://testnet.monadscan.com/tx/0xf0480d5c5d9d784693719910a50a06d4358ee508fab222838951dad4e4b4d11a).
+- Known blockers: no production Worker URL or complete live claim flow is verified. Agent C's task file still contains contradictory deployment notes and must be reconciled with the RPC receipt above. The repo's local build does not provision Worker secrets or contract address. Two-browser production WebSocket acceptance is not complete.
 - Handoff: READY FOR INTEGRATION on `integration/trial`; full deployment acceptance remains blocked on live runtime configuration and claim evidence.
