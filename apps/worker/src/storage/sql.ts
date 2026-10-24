@@ -1,3 +1,5 @@
+import { JsSqlStore } from './jsSql'
+
 export type SqlValue = string | number | boolean | null
 
 export interface SqlCursor<T extends Record<string, SqlValue>> {
@@ -37,18 +39,82 @@ function asRow<T extends Record<string, SqlValue>>(row: Record<string, SqlStorag
   return copy as T
 }
 
+const stores = new WeakMap<DurableObjectState, JsSqlStore>()
+const failedOverStates = new WeakSet<DurableObjectState>()
+
+export function getJsSqlStore(state: DurableObjectState): JsSqlStore {
+  let store = stores.get(state)
+  if (!store) {
+    store = new JsSqlStore()
+    stores.set(state, store)
+  }
+  return store
+}
+
+export async function loadStorage(state: DurableObjectState): Promise<void> {
+  if (typeof state?.storage?.get !== 'function') return
+  try {
+    const saved = await state.storage.get<{ rowIdCounter: number; tables: Record<string, Array<Record<string, SqlValue>>> }>('boai_sql_tables')
+    if (saved) {
+      failedOverStates.add(state)
+      const store = getJsSqlStore(state)
+      store.deserialize(saved)
+    }
+  } catch {
+    // KV storage read fallback
+  }
+}
+
+export async function persistStorage(state: DurableObjectState): Promise<void> {
+  if (typeof state?.storage?.put !== 'function') return
+  if (!failedOverStates.has(state)) return
+  const store = getJsSqlStore(state)
+  if (store.isDirty()) {
+    try {
+      await state.storage.put('boai_sql_tables', store.serialize())
+      store.markClean()
+    } catch {
+      // KV storage write fallback
+    }
+  }
+}
+
 /**
- * Cloudflare names the synchronous SQLite transaction `transactionSync`, and its rows may
- * contain ArrayBuffer. Both differ from the in-memory store used by tests, so every Durable
- * Object must adapt through this function instead of casting `state.storage.sql` directly.
+ * Adapts Cloudflare Durable Object SQLite with synchronous transaction conversion.
+ * If Cloudflare's free-tier row read limit is exceeded, automatically fails over
+ * to an in-memory JS SQL store so the Durable Object continues running seamlessly.
  */
 export function durableObjectSql(state: DurableObjectState): SqlStore {
   return {
     exec: <T extends Record<string, SqlValue>>(query: string, ...bindings: SqlValue[]) => {
-      const rows = state.storage.sql.exec<Record<string, SqlStorageValue>>(query, ...bindings).toArray()
-      return cursor(rows.map(row => asRow<T>(row)))
+      if (failedOverStates.has(state)) {
+        return getJsSqlStore(state).exec<T>(query, ...bindings)
+      }
+      try {
+        const rows = state.storage.sql.exec<Record<string, SqlStorageValue>>(query, ...bindings).toArray()
+        return cursor(rows.map(row => asRow<T>(row)))
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message.includes('Exceeded allowed rows read')) {
+          failedOverStates.add(state)
+          return getJsSqlStore(state).exec<T>(query, ...bindings)
+        }
+        throw err
+      }
     },
-    transaction: closure => state.storage.transactionSync(closure),
+    transaction: closure => {
+      if (failedOverStates.has(state)) {
+        return getJsSqlStore(state).transaction(closure)
+      }
+      try {
+        return state.storage.transactionSync(closure)
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message.includes('Exceeded allowed rows read')) {
+          failedOverStates.add(state)
+          return getJsSqlStore(state).transaction(closure)
+        }
+        throw err
+      }
+    },
   }
 }
 

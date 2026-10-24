@@ -1,4 +1,4 @@
-import type { SqlCursor, SqlStore, SqlValue } from '../storage/sql'
+import { durableObjectSql, loadStorage, persistStorage } from '../storage/sql'
 import type { Env } from '../routes/env'
 import type { LeaderboardRecordRequest, PracticeStartRequest, QueueJoinRequest } from '../routes/doProtocol'
 import { HttpError, readJson, requireString } from '../routes/http'
@@ -8,42 +8,7 @@ export const DEFAULT_TICKET_MAX_AGE_MS = 120_000
 
 type Handler = (request: Request, url: URL) => Promise<unknown>
 
-function cursor<T extends Record<string, SqlValue>>(rows: T[]): SqlCursor<T> {
-  let index = 0
-  return {
-    toArray: () => rows.slice(),
-    one: () => {
-      if (rows.length === 0) throw new Error('Query returned no rows')
-      return rows[0]
-    },
-    next: () => {
-      if (index >= rows.length) return { done: true, value: undefined }
-      const value = rows[index]
-      index += 1
-      return { done: false, value }
-    },
-  }
-}
 
-// Durable Object SQL can return ArrayBuffer, which SqlStore does not model; narrow it at the adapter boundary.
-function asRow<T extends Record<string, SqlValue>>(row: Record<string, SqlStorageValue>): T {
-  const copy: Record<string, SqlValue> = {}
-  for (const [key, value] of Object.entries(row)) {
-    if (value instanceof ArrayBuffer) throw new Error(`Kolom ${key} tidak boleh berupa blob`)
-    copy[key] = value
-  }
-  return copy as T
-}
-
-function durableObjectSql(state: DurableObjectState): SqlStore {
-  return {
-    exec: <T extends Record<string, SqlValue>>(query: string, ...bindings: SqlValue[]) => {
-      const rows = state.storage.sql.exec<Record<string, SqlStorageValue>>(query, ...bindings).toArray()
-      return cursor(rows.map(row => asRow<T>(row)))
-    },
-    transaction: closure => state.storage.transactionSync(closure),
-  }
-}
 
 async function readUserId(request: Request, url: URL, field: string): Promise<string> {
   if (request.method === 'GET') return requireString(url.searchParams.get(field), field)
@@ -63,7 +28,10 @@ export class MatchmakerDurableObject {
     const handler = this.routes().get(url.pathname)
     if (!handler) return Response.json({ error: 'Rute matchmaker tidak dikenal', code: 'NOT_FOUND' }, { status: 404 })
     try {
-      return Response.json(await handler(request, url))
+      await loadStorage(this.state)
+      const result = await handler(request, url)
+      await persistStorage(this.state)
+      return Response.json(result)
     } catch (error) {
       if (error instanceof HttpError) {
         return Response.json({ error: error.message, code: error.code }, { status: error.status })

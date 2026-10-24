@@ -2,7 +2,7 @@ import type { CoachCommand, MatchEvent, MatchSnapshot } from '@boai/shared/types
 import type { Env } from '../routes/env'
 import { HttpError } from '../routes/http'
 import type { CoachRequest, MatchInitRequest } from '../routes/doProtocol'
-import { durableObjectSql } from '../storage/sql'
+import { durableObjectSql, loadStorage, persistStorage } from '../storage/sql'
 import { MATCH } from '../game/ruleset'
 import { MatchService } from './matchService'
 import { MatchSession } from './matchSocket'
@@ -77,6 +77,7 @@ export class MatchDurableObject {
     this.timer = setInterval(() => {
       try {
         session.advanceTo(this.targetTick(this.service().view(matchId).snapshot))
+        void persistStorage(this.state)
       } catch {
         this.stopLoop()
       }
@@ -106,12 +107,19 @@ export class MatchDurableObject {
 
   async fetch(request: Request): Promise<Response> {
     try {
+      await loadStorage(this.state)
       const url = new URL(request.url)
       const matchId = this.matchIdFrom(url)
       if (!matchId) throw new HttpError('INVALID_MATCH_ID', 'matchId wajib disertakan', 400)
 
-      if (request.headers.get('Upgrade') === 'websocket') return this.upgrade(url, matchId)
-      return await this.http(request, url, matchId)
+      if (request.headers.get('Upgrade') === 'websocket') {
+        const response = this.upgrade(url, matchId)
+        await persistStorage(this.state)
+        return response
+      }
+      const response = await this.http(request, url, matchId)
+      await persistStorage(this.state)
+      return response
     } catch (error) {
       return errorResponse(error)
     }
@@ -206,6 +214,7 @@ export class MatchDurableObject {
     if (!attached || typeof message !== 'string') return
     const replies = this.sessionFor(attached.matchId).handleMessage(attached.userId, message)
     for (const reply of replies) attached.sink.send(JSON.stringify(reply))
+    await persistStorage(this.state)
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {

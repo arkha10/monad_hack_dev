@@ -5,7 +5,7 @@ import type {
   LedgerTeamRequest,
 } from '../routes/doProtocol'
 import type { Env } from '../routes/env'
-import { durableObjectSql } from '../storage/sql'
+import { durableObjectSql, loadStorage, persistStorage } from '../storage/sql'
 import { LedgerService, asAddress, asHash, isClaimStatus } from './ledgerService'
 
 type Body = Record<string, unknown>
@@ -82,56 +82,62 @@ export class LedgerDurableObject {
 
   async fetch(request: Request): Promise<Response> {
     try {
+      await loadStorage(this.state)
       const path = new URL(request.url).pathname
       const body = await readBody(request)
       const userId = text(body, 'userId')
       const ledger = this.ledger()
-      switch (path) {
-        case '/sync':
-          return Response.json(ledger.syncProfile(userId, syncRequest(body)))
-        case '/team/get':
-          return Response.json(ledger.getTeam(userId))
-        case '/team/save':
-          return Response.json(ledger.saveTeam(userId, teamRequest(body)))
-        case '/balance':
-          return Response.json(ledger.getBalance(userId))
-        case '/reserve':
-          return Response.json(ledger.reserve(userId, creditOp(body)))
-        case '/settle':
-          return Response.json(ledger.settle(userId, creditOp(body)))
-        case '/refund':
-          return Response.json(ledger.refund(userId, creditOp(body)))
-        case '/credit':
-          return Response.json(ledger.credit(userId, creditOp(body)))
-        case '/purchase':
-          return Response.json(ledger.purchaseCosmetic(userId, text(body, 'cosmeticId')))
-        case '/owned':
-          return Response.json(ledger.listOwned(userId))
-        case '/ad':
-          return Response.json(ledger.claimAdReward(userId))
-        case '/nonce/issue':
-          return Response.json(ledger.issueNonce(userId, asAddress(text(body, 'address'))))
-        case '/nonce/consume':
-          return Response.json(
-            ledger.consumeNonce(userId, text(body, 'address'), text(body, 'nonce'), integer(body, 'nowMs')),
-          )
-        case '/nonce/current':
-          return Response.json(ledger.currentNonce(userId, text(body, 'address'), integer(body, 'nowMs')))
-        case '/wallet/link':
-          return Response.json(
-            ledger.linkWallet(userId, asAddress(text(body, 'address')), integer(body, 'verifiedAtMs')),
-          )
-        case '/wallet/get':
-          return Response.json(ledger.getWallet(userId))
-        case '/reward/get':
-          return Response.json(ledger.getRewardClaim(userId, text(body, 'matchId')))
-        case '/reward/upsert':
-          return Response.json(
-            ledger.upsertRewardClaim(userId, rewardClaim(body), integer(body, 'nowMs')),
-          )
-        default:
-          return Response.json({ error: `Rute tidak dikenali: ${path}` }, { status: 400 })
+      const handle = () => {
+        switch (path) {
+          case '/sync':
+            return Response.json(ledger.syncProfile(userId, syncRequest(body)))
+          case '/team/get':
+            return Response.json(ledger.getTeam(userId))
+          case '/team/save':
+            return Response.json(ledger.saveTeam(userId, teamRequest(body)))
+          case '/balance':
+            return Response.json(ledger.getBalance(userId))
+          case '/reserve':
+            return Response.json(ledger.reserve(userId, creditOp(body)))
+          case '/settle':
+            return Response.json(ledger.settle(userId, creditOp(body)))
+          case '/refund':
+            return Response.json(ledger.refund(userId, creditOp(body)))
+          case '/credit':
+            return Response.json(ledger.credit(userId, creditOp(body)))
+          case '/purchase':
+            return Response.json(ledger.purchaseCosmetic(userId, text(body, 'cosmeticId')))
+          case '/owned':
+            return Response.json(ledger.listOwned(userId))
+          case '/ad':
+            return Response.json(ledger.claimAdReward(userId))
+          case '/nonce/issue':
+            return Response.json(ledger.issueNonce(userId, asAddress(text(body, 'address'))))
+          case '/nonce/consume':
+            return Response.json(
+              ledger.consumeNonce(userId, text(body, 'address'), text(body, 'nonce'), integer(body, 'nowMs')),
+            )
+          case '/nonce/current':
+            return Response.json(ledger.currentNonce(userId, text(body, 'address'), integer(body, 'nowMs')))
+          case '/wallet/link':
+            return Response.json(
+              ledger.linkWallet(userId, asAddress(text(body, 'address')), integer(body, 'verifiedAtMs')),
+            )
+          case '/wallet/get':
+            return Response.json(ledger.getWallet(userId))
+          case '/reward/get':
+            return Response.json(ledger.getRewardClaim(userId, text(body, 'matchId')))
+          case '/reward/upsert':
+            return Response.json(
+              ledger.upsertRewardClaim(userId, rewardClaim(body), integer(body, 'nowMs')),
+            )
+          default:
+            return Response.json({ error: `Rute tidak dikenali: ${path}` }, { status: 400 })
+        }
       }
+      const response = handle()
+      await persistStorage(this.state)
+      return response
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Kesalahan tidak terduga'
       return Response.json({ error: message }, { status: 400 })

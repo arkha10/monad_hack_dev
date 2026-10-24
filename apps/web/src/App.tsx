@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import type { MatchResult, MatchSnapshot, ServerWsMessage, Team } from "@boai/shared/types";
 import { buildExplorerTxUrl, parseBehavior } from "@boai/shared/helpers";
@@ -466,7 +466,9 @@ function MatchPage() {
             setStatus("Pertandingan selesai! Siap melihat hasil.");
           }
         }
-      } catch {}
+      } catch {
+        // Polling retry on error
+      }
     }, 800);
 
     const connect = async () => {
@@ -631,7 +633,7 @@ function MatchPage() {
                           <div
                             key={i}
                             className="scattered-tile"
-                            style={{ ['--rot' as any]: `${(i * 35) - 45}deg` }}
+                            style={{ ['--rot' as string]: `${(i * 35) - 45}deg` } as React.CSSProperties}
                           />
                         ))}
                       </div>
